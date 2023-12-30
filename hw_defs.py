@@ -1,0 +1,134 @@
+#
+# Author: Ben Westcott
+# Date Created: 12/26/23
+#
+
+# 1MSPS for both DAC and ADCs
+# This makes it easier to partition the
+# data buffer
+SAMPLING_RATE = 1000000
+
+GCLK0 = 0x00
+GCLK1 = 0x01
+GCLK2 = 0x02
+GCLK4 = 0x04
+GCLK7 = 0x07
+
+# in Hz
+MCLK_FREQ = 120000000
+GCLK0_FREQ = 120000000
+GCLK1_FREQ = 48000000
+GCLK2_FREQ = 100000000
+GCLK4_FREQ = 12000000
+GCLK7_FREQ = 120000000
+
+# TODO: determine the other voltage references
+VREF_VREFAB = 3.3
+
+# TCC0 & TCC1 will always be on same GCLK
+TCC0_GCLK = GCLK0
+TCC1_GCLK = GCLK0
+
+TCC0_GCLK_FREQ = GCLK0_FREQ
+TCC1_GCLK_FREQ = GCLK0_FREQ
+
+TCC_PRESCALER_DIV1 = 0x00
+TCC_PRESCALER_DIV2 = 0x01
+TCC_PRESCALER_DIV4 = 0x02
+TCC_PRESCALER_DIV8 = 0x03
+TCC_PRESCALER_DIV16 = 0x04
+TCC_PRESCALER_DIV64 = 0x05
+TCC_PRESCALER_DIV256 = 0x06
+TCC_PRESCALER_DIV1024 = 0x07
+
+TCC_MAX_TOP = 65535
+TCC_MIN_TOP = 50
+
+TC0_GCLK = GCLK0
+TC1_GCLK = GCLK0
+
+TC_PRESCALER_DIV1 = 0x00
+TC_PRESCALER_DIV2 = 0x01
+TC_PRESCALER_DIV4 = 0x02
+TC_PRESCALER_DIV8 = 0x03
+TC_PRESCALER_DIV16 = 0x04
+TC_PRESCALER_DIV64 = 0x05
+TC_PRESCALER_DIV256 = 0x06
+TC_PRESCALER_DIV1024 = 0x07
+
+# prescalers across most peripherals will have these options
+PRESCALERS = [1, 2, 3, 8, 16, 64, 256, 1024]
+# precomputed inverse for speed
+INV_PRESCALERS = [1, 0.5, 0.75, 0.125, 0.0625, 0.015625, 0.00390625, 0.0009765625]
+# These are the values which will set the prescaler on the MCU
+# PRESCALERS = 2**(PRESCLAER_REG_VALS)
+PRESCALER_REG_VALS = [0, 1, 2, 3, 4, 5, 6, 7]
+
+# TCs have a COUNT32, COUNT16, and COUNT8 mode
+# but, I have chosen to only use the COUNT32 mode
+TC_PERIOD = 65535
+
+DAC_GCLK = GCLK4
+
+# 12-bit DAC
+DAC_MAX_INT = 4096
+
+# 1MSPS
+# But is effectively controlled by TCC0
+# since OVF condition on TCC0 generates the
+# DMA request
+DAC_SAMPLING_RATE = 1000000
+
+ADC0_GCLK = GCLK7
+ADC1_GCLK = GCLK7
+
+# 1MSPS
+# This could easily be made variable to
+# allow for longer sampling windows,
+# but for the time being, I dont see a reason to
+# add this functionality
+ADC_SAMPLING_RATE = 1000000
+
+EVSYS_CH0_GCLK = GCLK0
+EVSYS_CH1_GCLK = GCLK0
+EVSYS_CH2_GCLK = GCLK0
+EVSYS_CH3_GCLK = GCLK0
+EVSYS_CH4_GCLK = GCLK0
+EVSYS_CH5_GCLK = GCLK0
+
+# opcodes/commands
+OP_NO_ACT = 0xff
+OP_START_JOB = 0xfe
+OP_AMP_ENABLE = 0xfd
+OP_AMP_DISABLE = 0xfb
+OP_UPDATE_JOB = 0xfa
+
+UOP_BUFFER = 0xef
+UOP_CHIRP = 0xed
+UOP_WAIT_TIMER_PERIOD =  0xec
+UOP_WAIT_TIMER_PRESCALER = 0xeb
+UOP_FINISH = 0xea
+
+SOP_COMMAND = 0x44
+SOP_DATA = 0x45
+
+S_ACK = 0x55
+S_UPDATE_COMPLETE = 0x56
+
+MAX_BUFFER_LENGTH = 80000
+MAX_DESCRIPTOR_LENGTH = 65535
+
+# bytes per block that the MCU sends
+S_CHUNK_LENGTH = 64
+
+#
+# DATA BUFFER EXAMPLE PARTITION
+#
+# ||====chirp====||========listenR=========||=========listenL========||
+#
+DEFAULT_CHIRP_LEN = 3000
+DEFAULT_LISTEN_LEN = 30000
+DEFAULT_N_LISTEN = 60000
+DEFAULT_N = 63000
+
+

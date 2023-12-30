@@ -1,0 +1,82 @@
+
+data_directory: "data_dst"
+
+do_plot: True
+
+sonar_boards:
+    - "FBD7447F5351523450202020FF0E320A" #brunei original
+    - "3BF9331F5351523450202020FF111D35" #brunei 50ms
+    - "E23032655351523450202020FF0E3B0C" #brunei 40ms
+    - "D9E57EA65351523450202020FF103B42" #brunei 20ms
+    - "27D2EA9E53544C324E202020FF18483D"
+    - "A597C94353544C324E202020FF18412B"
+    - "FE7A097953544C324E202020FF183D0A"
+    - "0EAA11575351523450202020FF113038"
+    - "B2423AC95351523450202020FF0E0F43"
+    - "DF7AE18B5351523450202020FF113537"
+    - "C896BF835351523450202020FF0E440D"
+    - "5CD17E845351523450202020FF103D1B"
+    - "D6EFADF25351523450202020FF111436"
+    - "6A3E92CE5351523450202020FF0E4431"
+    
+sonar_baud: 115200
+    
+sonar:
+
+    do_chirp: true
+    chirp:
+        f0: 120000
+        f1: 10000
+        length: 3000
+        method: "linear"
+        window:  "hann"
+    
+    do_listen: true
+    listen:
+        wait_time: 0.5E-6
+        lengthR: 30000
+        lengthL: 30000
+        
+
+sonar_plot:
+
+    spec_color_map: 'jet'
+    update_interval: 1
+    calibration_interval: 10
+    y_amplitude_padding: 10000
+    
+    fft_settings:
+        NFFT: 512
+        noverlap: 400
+        
+
+gps:
+    do_gps: false
+    
+    ser_port: "/dev/ttyACM1"
+    baud_rate: 9600
+    timeout: 3
+   
+    do_rtk_correction: true
+    ntrip:
+        ipprot: "IPv4"
+        server: "rtk2go.com"
+        port: 2101
+        flowinfo: 0     # IPv6 -- not implemented yet
+        scopeid: 0      # IPv6 -- not implemented yet
+        mountpoint: ""  # Autodetects mountpoint, leave as is for now
+        username: "bwestcott@vt.edu"
+        password: "none"
+        
+        ggamode: 0
+        ggaint: 60
+        
+        # Ignored unless ggamode = 1
+        reflat: 37.2223
+        reflon: -80.4257
+        refalt: 40.8542
+        refsep: 26.1743
+    
+    
+
+    
