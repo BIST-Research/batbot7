@@ -20,6 +20,7 @@
 #include <ml_tcc_common.h>
 #include <ml_tcc0.h>
 #include <ml_tcc1.h>
+#include <ml_tcc2.h>
 
 #define MAX_BUFFER_LENGTH 80000
 #define DEFAULT_CHIRP_LENGTH 5000
@@ -142,7 +143,7 @@ const uint32_t chirp_dmac_channel_settings =
 (
   DMAC_CHCTRLA_BURSTLEN_SINGLE |
   DMAC_CHCTRLA_TRIGACT_BURST |
-  DMAC_CHCTRLA_TRIGSRC(TCC0_DMAC_ID_OVF)
+  DMAC_CHCTRLA_TRIGSRC(TCC2_DMAC_ID_OVF)
 );
 
 const uint16_t chirp_dmac_descriptor_settings = 
@@ -577,7 +578,8 @@ void handle_serial_update_command(host_update_action action, run_data *msg)
       clen = READ_HALF_WORD();
       rlen = READ_HALF_WORD();
       llen = READ_HALF_WORD();
-      
+      //msg->nchunks = READ_HALF_WORD();
+
       disable_event_inputs();
       partition_data_buffer(clen, rlen, llen);
       update_transfer_descriptors();
@@ -610,7 +612,7 @@ void handle_serial_update_command(host_update_action action, run_data *msg)
 
     case UPDATE_WAIT_TIMER_PRESCALER:
     {
-      while(Serial.available() < 2);
+      while(Serial.available() < 1);
       msg->wait_timer_prescaler = Serial.read();
       TCC_update_prescaler(TCC1, msg->wait_timer_prescaler);
       break;
@@ -677,9 +679,9 @@ void setup(void)
   DAC0_enable();
 
   // DAC timer init
-  TCC0_init();
+  TCC2_init();
   peripheral_port_init(&tcc0_pin);
-  TCC_enable(TCC0);
+  TCC_enable(TCC2);
   
   // ADC init
   ADC0_init();

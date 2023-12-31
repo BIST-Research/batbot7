@@ -81,7 +81,9 @@ def check_partition(clen, rlen, llen):
 # additional chunk. When data is received,
 # prune it to length
 def determine_chunk_count(length):
-    blen = 2*length                         # length in bytes
+    blen = 2*length              # length in bytes
+    if blen <= S_CHUNK_LENGTH:
+        return 1
     cnt = int(blen/S_CHUNK_LENGTH)
     if blen % S_CHUNK_LENGTH:
         cnt = cnt + 1
@@ -113,7 +115,7 @@ def determine_timer_vals(T_out):
     for i in range(0, len(PRESCALERS)):
         TOP = (ratio / PRESCALERS[i]) - 1
         if TOP <= TCC_MAX_TOP:
-            return (T_out, TOP, PRESCALER_REG_VALS[i], PRESCALERS[i])
+            return (T_out, int(TOP), PRESCALER_REG_VALS[i], PRESCALERS[i])
             
     return (None, None, None, None)
         
@@ -159,7 +161,6 @@ class SonarController:
             self.bat_log.critical(f"Invalid partition scheme! Defaulted.")
 
         self.refresh_listen_times()
-        self.refresh_wait_time()        
         # tuple containing time vector, window, and chirp vector
         self.tv_chirp, self.win_chirp, self.v_chirp = generate_chirp(f0, f1, self.T_chirp, self.N_chirp, self.Ts, method=chirp_method, window=window)
         
@@ -179,9 +180,6 @@ class SonarController:
         self.T_listen = self.T_listenR + self.T_listenL
         self.T = self.T_listen + self.T_chirp
         
-    def refresh_wait_time(self):
-        self.T_wait = (self.TOP_wait * self.P_wait)/TCC1_GCLK_FREQ
-
     def amp_enable(self):
         self.m4.write([SOP_COMMAND, OP_AMP_ENABLE])
     
@@ -220,7 +218,7 @@ class SonarController:
         self.N_listen = rlen + llen
         self.N = self.N_listen + clen
         self.N_chunks = determine_chunk_count(self.N_listen)
-        
+                
         return True
     
     # enforce the length of the buffer before calling
@@ -247,6 +245,31 @@ class SonarController:
             b_array = list2bytearr(buffer, 2)
         
         self.m4.write(b_array)
+        
+    def wait_timer_update(self, period):
+        
+        if not self.updating:
+            return False
+            
+        T, TOP, reg_val, P = determine_timer_vals(period)
+        
+        #print(f"{T},{TOP},{reg_val},{P}\n")
+        
+        if reg_val != self.Preg_wait:
+            #print(f"reg: {[SOP_COMMAND, UOP_WAIT_TIMER_PRESCALER, reg_val]}")
+            self.m4.write([SOP_COMMAND, UOP_WAIT_TIMER_PRESCALER, reg_val])
+            self.Preg_wait = reg_val
+            self.P_wait = P
+            
+        if TOP != self.TOP_wait:
+            self.m4.write([SOP_COMMAND, UOP_WAIT_TIMER_TOP])
+            b = list2bytearr([TOP], 2)
+            #print(f"TOP: {b}\n")
+            self.m4.write(list2bytearr([TOP], 2))
+            self.TOP_wait = TOP
+            
+        self.T_wait = T
+        return True
     
     # Needs to be called when finished updating
     def exit_update(self):
@@ -275,8 +298,10 @@ class SonarController:
         # or if it is currently processing a job
         if self.updating or self.running:
             return False
+        
+        if self.N_listen:
+            self.running = True
             
-        self.running = True
         self.m4.write([SOP_COMMAND, OP_START_JOB, do_chirp])
         return True
      
@@ -284,7 +309,7 @@ class SonarController:
     #
     # False:
     #  if MCU is in update state
-    #  if a job wasnt started
+    #  if a job wasnt started, or if N_listen = 0, i.e. we do not expect data back
     #
     # None: if we are still waiting for the job to complete
     #
@@ -292,7 +317,7 @@ class SonarController:
     def get_job(self):
         
         if self.updating or not self.running:
-            return False
+            return False    
         
         if self.m4.in_waiting() <= 0:
             return None
@@ -305,4 +330,7 @@ class SonarController:
         
     def is_running(self):
         return self.running
+        
+    def get_num_listen_samples(self):
+        return self.N_listen
         
