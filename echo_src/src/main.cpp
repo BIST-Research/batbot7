@@ -475,7 +475,6 @@ typedef enum
   UPDATE_WAIT_TIMER_PRESCALER = 0xeb, UPDATE_FINISH = 0xea
 } host_update_action;
 
-
 // D10 --> PA20
 const ml_pin_settings amp_pin = {PORT_GRP_A, 20, PF_A, PP_EVEN, OUTPUT_PULL_DOWN, DRIVE_ON};
 // A0 --> PA02
@@ -765,7 +764,6 @@ void loop(void)
 
     case BUSY:
     {
-
       if(exit_intflag_A & exit_intflag_B)
       {
         if(listenL_len == 0 && listenR_len == 0)

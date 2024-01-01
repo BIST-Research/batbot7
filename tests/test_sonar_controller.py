@@ -81,9 +81,8 @@ class TestSonarController(unittest.TestCase):
         self.assertFalse(self.sonar.is_updating())
         
     def assert_start_job(self):
-        self.assertTrue(self.sonar.start_job(do_chirp=False))
-        if self.sonar.get_num_listen_samples(): 
-            self.assertTrue(self.sonar.is_running())
+        self.assertTrue(self.sonar.start_job(do_chirp=True))
+        self.assertTrue(self.sonar.is_running())
         self.assertFalse(self.sonar.is_updating())
         
     def assert_n_runs(self, N, print_time=False):
@@ -102,11 +101,7 @@ class TestSonarController(unittest.TestCase):
             if print_time:
                 print(f"{n}: {end_time - start_time}")
                 
-            if self.sonar.get_num_listen_samples():    
-                self.assertEqual(len(data), self.sonar.N_chunks * S_CHUNK_LENGTH)
-            else:
-                self.assertEqual(data, False)
-                
+            self.assertEqual(len(data), self.sonar.N_chunks * S_CHUNK_LENGTH)                
             self.assertFalse(self.sonar.is_running())
         
     def test_basic_buffer_upd(self):
@@ -129,7 +124,7 @@ class TestSonarController(unittest.TestCase):
         
         do_n_runs(self, self.sonar, 10, self.rlen, self.llen)
         
-    def test_single_wait_timer_upd(self):
+    def single_wait_timer_upd(self):
         
         period = 1E-6
         
@@ -137,7 +132,9 @@ class TestSonarController(unittest.TestCase):
         self.assertTrue(self.sonar.wait_timer_update(period))
         self.assert_exit_update()
         
-        do_n_runs(self, self.sonar, 10, self.rlen, self.llen)
+        self.assert_n_runs(10, print_time=True)
+        
+        #do_n_runs(self, self.sonar, 10, self.rlen, self.llen)
         
     def test_wait_timer_upd_buffer_upd(self):
         
@@ -175,8 +172,27 @@ class TestSonarController(unittest.TestCase):
             print(f"clen={ci}\trlen={ri}\tllen={li}\tnruns={ni}\twait={t}")
             self.assert_n_runs(ni, print_time=True)
                         
-            picker += 1        
+            picker += 1  
+            
+    def test_single_chirp_upd(self):
         
+        x_wave = np.linspace(0, 3000, 3000)
+        wave = (DAC_MAX_INT/2) * (1 + np.sin(x_wave))
+        period = 1E-6
+        
+        self.assert_enter_update()
+        self.assertTrue(self.sonar.wait_timer_update(period))
+        self.assertTrue(self.sonar.buffer_update(3000, 10000, 10000))
+        self.assertTrue(self.sonar.chirp_update(wave))
+        self.assert_exit_update()
+        self.assert_n_runs(10, print_time = True)
+        
+        self.assert_enter_update()
+        self.assert_exit_update()
+        #do_n_runs(self, self.sonar, 1, 10000, 10000)
+        
+        
+                
 if __name__ == '__main__':
     unittest.main()
     
@@ -191,6 +207,11 @@ if __name__ == '__main__':
     #sonar.wait_timer_update(6E-4)
     #sonar.exit_update()
     
+    #t = time_single_run(sonar)
+    #print(t)
+    #time_single_run(sonar)
+    
+    
     #s = 0
     #for n in range(0, 10):
     #    t = time_single_run(sonar)
@@ -204,5 +225,4 @@ if __name__ == '__main__':
     # to get the sample (which is two bytes i.e. a uint16_t)! 
     # TODO: Create an SPI lane to send the data, or figure out why
     # UART is so slow.
-    #print(f"{s}, {s/10}")   
-        
+    #print(f"{s}, {s/10}") 

@@ -244,7 +244,9 @@ class SonarController:
         if b_array is None:
             b_array = list2bytearr(buffer, 2)
         
+        self.m4.write([SOP_DATA])
         self.m4.write(b_array)
+        return True
         
     def wait_timer_update(self, period):
         
@@ -299,9 +301,7 @@ class SonarController:
         if self.updating or self.running:
             return False
         
-        if self.N_listen:
-            self.running = True
-            
+        self.running = True    
         self.m4.write([SOP_COMMAND, OP_START_JOB, do_chirp])
         return True
      
@@ -321,9 +321,11 @@ class SonarController:
         
         if self.m4.in_waiting() <= 0:
             return None
+            
+        data = self.m4.read(S_CHUNK_LENGTH * self.N_chunks)
         
         self.running = False
-        return self.m4.read(S_CHUNK_LENGTH * self.N_chunks)
+        return data
         
     def is_updating(self):
         return self.updating
