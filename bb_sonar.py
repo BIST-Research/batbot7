@@ -252,24 +252,22 @@ class SonarController:
         
         if not self.updating:
             return False
-            
+        
         T, TOP, reg_val, P = determine_timer_vals(period)
-        
         #print(f"{T},{TOP},{reg_val},{P}\n")
-        
+        if TOP != self.TOP_wait:
+            self.m4.write([SOP_COMMAND, UOP_WAIT_TIMER_TOP])
+            b = list2bytearr([TOP], 2)
+            print(f"TOP: {b}\n")
+            self.m4.write(list2bytearr([TOP], 2))
+            self.TOP_wait = TOP
+            
         if reg_val != self.Preg_wait:
             #print(f"reg: {[SOP_COMMAND, UOP_WAIT_TIMER_PRESCALER, reg_val]}")
             self.m4.write([SOP_COMMAND, UOP_WAIT_TIMER_PRESCALER, reg_val])
             self.Preg_wait = reg_val
             self.P_wait = P
-            
-        if TOP != self.TOP_wait:
-            self.m4.write([SOP_COMMAND, UOP_WAIT_TIMER_TOP])
-            b = list2bytearr([TOP], 2)
-            #print(f"TOP: {b}\n")
-            self.m4.write(list2bytearr([TOP], 2))
-            self.TOP_wait = TOP
-            
+        
         self.T_wait = T
         return True
     
@@ -326,6 +324,12 @@ class SonarController:
         
         self.running = False
         return data
+        
+    def amp_enable(self):
+        self.m4.write([SOP_COMMAND, OP_AMP_ENABLE])
+    
+    def amp_disable(self):
+        self.m4.write([SOP_COMMAND, OP_AMP_DISABLE])
         
     def is_updating(self):
         return self.updating

@@ -122,48 +122,50 @@ class TestSonarController(unittest.TestCase):
         self.assertEqual(len(data), 2*(self.rlen + self.llen))
         self.assertFalse(self.sonar.is_running())
         
-        do_n_runs(self, self.sonar, 10, self.rlen, self.llen)
-        
-    def single_wait_timer_upd(self):
-        
-        period = 1E-6
-        
-        self.assert_enter_update()
-        self.assertTrue(self.sonar.wait_timer_update(period))
-        self.assert_exit_update()
-        
         self.assert_n_runs(10, print_time=True)
-        
         #do_n_runs(self, self.sonar, 10, self.rlen, self.llen)
         
-    def test_wait_timer_upd_buffer_upd(self):
+    def test_wait_timer_upd_buffer_upd_chirp_upd(self):
         
-        it = 10
-          
+        it = 30
+        
+        self.sonar.amp_enable()
+        
         #tv = np.linspace(0.5E-6, 0.5, it)
         # TODO: the case where listenL = listenR = 0 doesnt work. 
         # The update condition is either not reached on the subsequent update condition,
         # or we get stuck in update condition.
-        tv = [0.5E-6, 1E-6, 5E-5, 6E-5, 8E-4, 9E-6, 3E-2, 4E-2, 9E-4, 0.5]
+        tv = [0.5, 1E-6, 5E-5, 6E-5, 8E-4, 9E-6, 3E-2, 4E-2, 9E-4, 0.5E-6]
         cv = np.linspace(10, it * 100, it)
-        lv = np.linspace(10, it * 100, it)
-        rv = np.linspace(10, it * 200, it)
+        lv = np.linspace(10, it * 1000, it)
+        rv = np.linspace(10, it * 1000, it)
         
         nv = np.linspace(it, 1, it)
         
         picker = 1
         for t,c,l,r,n in zip(tv, cv, lv, rv, nv):
-            self.assert_enter_update()
             
             ci, li, ri, ni = (int(c), int(l), int(r), int(n))
             
-            # checking to see whether the order of updates matters -- it shouldnt
-            if picker % 2 == 0:
+            x_wave = np.linspace(0, ci, ci)
+            wave = (DAC_MAX_INT/2) * (1 + np.sin(x_wave))
+            wave_out = [int(w) for w in wave]
+            
+            self.assert_enter_update()
+            
+            if picker % 7 == 0:
                 self.assertTrue(self.sonar.wait_timer_update(t))
                 self.assertTrue(self.sonar.buffer_update(ci, li, ri))
+                self.assertTrue(self.sonar.chirp_update(wave_out))
+            elif picker % 5 == 0:
+                self.assertTrue(self.sonar.buffer_update(ci, li, ri))
+                self.assertTrue(self.sonar.chirp_update(wave_out))
+                self.assertTrue(self.sonar.wait_timer_update(t))
+            elif picker % 3 == 0:
+                self.assertTrue(self.sonar.wait_timer_update(t))
             else:
                 self.assertTrue(self.sonar.buffer_update(ci, li, ri))
-                self.assertTrue(self.sonar.wait_timer_update(t))
+                
                 
             #self.assertTrue(self.sonar.wait_timer_update(tr))
             #self.assertTrue(self.sonar.buffer_update(ci, ri, li))
@@ -172,45 +174,58 @@ class TestSonarController(unittest.TestCase):
             print(f"clen={ci}\trlen={ri}\tllen={li}\tnruns={ni}\twait={t}")
             self.assert_n_runs(ni, print_time=True)
                         
-            picker += 1  
+            picker += 1 
+            
+        self.sonar.amp_disable()
+                 
             
     def test_single_chirp_upd(self):
         
         x_wave = np.linspace(0, 3000, 3000)
         wave = (DAC_MAX_INT/2) * (1 + np.sin(x_wave))
+        wave_out = [int(w) for w in wave]
         period = 1E-6
         
         self.assert_enter_update()
         self.assertTrue(self.sonar.wait_timer_update(period))
         self.assertTrue(self.sonar.buffer_update(3000, 10000, 10000))
-        self.assertTrue(self.sonar.chirp_update(wave))
+        self.assertTrue(self.sonar.chirp_update(wave_out))
         self.assert_exit_update()
         self.assert_n_runs(10, print_time = True)
         
-        self.assert_enter_update()
-        self.assert_exit_update()
+        #self.assert_enter_update()
+        #self.assert_exit_update()
+        
         #do_n_runs(self, self.sonar, 1, 10000, 10000)
         
-        
-                
 if __name__ == '__main__':
     unittest.main()
     
     #bat_log = bb_log.get_log()
     #sonar = init_board(bat_log)
     
+    #x_wave = np.linspace(0, 3000, 3000)
+    #wave = np.sin(x_wave)
+    
+    #wave = (DAC_MAX_INT/2) * (1 + np.sin(x_wave))
+    #wave_out = [int(w) for w in wave]
+    #period = 1E-6
+    
     # Trying to see how long it takes to send one 
     # sample. 1 sample ideally takes 1us + a little more
     # to arrive in the data buffer, so negligable for now.
     #sonar.enter_update()
-    #sonar.buffer_update(3000, 0, 0)
+    #sonar.buffer_update(3000, 1000, 1000)
+    #sonar.chirp_update(wave_out)
     #sonar.wait_timer_update(6E-4)
     #sonar.exit_update()
     
     #t = time_single_run(sonar)
+    #t = time_single_run(sonar)
+    #t = time_single_run(sonar)
     #print(t)
     #time_single_run(sonar)
-    
+        
     
     #s = 0
     #for n in range(0, 10):

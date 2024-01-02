@@ -28,6 +28,76 @@
 #define DEFAULT_WAIT_TIMER_PERIOD 100
 #define DEFAULT_WAIT_TIMER_PRESCALER TCC_CTRLA_PRESCALER_DIV4_Val
 
+#define CHIRP_DMAC_CHANNEL 0x00
+#define LISTEN_R_DMAC_CHANNEL 0x01
+#define LISTEN_L_DMAC_CHANNEL 0x02
+
+#define WAIT_TIMER_START_CHANNEL 0x00
+#define EXIT_TIMER_A_START_CHANNEL 0x01
+#define EXIT_TIMER_B_START_CHANNEL 0x02
+#define LISTEN_R_START_CHANNEL 0x03
+#define LISTEN_L_START_CHANNEL 0x04
+#define CHIRP_START_CHANNEL 0x05
+
+#define LISTEN_START_SOFT_TRIGGER() (EVSYS->SWEVT.bit.CHANNEL0 = 0x01)
+#define CHIRP_START_SOFT_TRIGGER() (EVSYS->SWEVT.bit.CHANNEL5 = 0x01)
+
+#define EVSYS_ID_GEN_NONE 0x00
+
+#define S_CHUNK_SIZE 64
+#define S_ACK 0x55
+#define S_UPDATE_COMPLETE 0x56
+
+#define S_WRITE_ACK() (Serial.write(S_ACK))
+#define S_WRITE_UPDATE_COMPLETE() (Serial.write(S_UPDATE_COMPLETE))
+
+#define S_COMMAND 0x44
+#define S_DATA 0x45
+
+#define S_READ_BYTE() ((uint8_t)Serial.read())
+#define S_READ_HALF_WORD() ((uint16_t)Serial.read() << 8 | (uint16_t)Serial.read())
+#define S_COMMAND_AVAILABLE() (Serial.available() && Serial.read() == S_COMMAND)
+#define S_DATA_AVAILABLE() (Serial.available() && SERIAL.read() == S_DATA)
+
+static DmacDescriptor base_descriptor[3] __attribute__((aligned(16)));
+static volatile DmacDescriptor wb_descriptor[3] __attribute__((aligned(16)));
+
+typedef enum 
+{
+  NO_ACT = 0xff, START_JOB = 0xfe, AMP_ENABLE = 0xfd, 
+  AMP_DISABLE = 0xfb, UPDATE_JOB = 0xfa
+} host_action;
+
+typedef enum
+{
+  UPDATE_BUFFER = 0xef, UPDATE_CHIRP = 0xed, UPDATE_WAIT_TIMER_PERIOD = 0xec,
+  UPDATE_WAIT_TIMER_PRESCALER = 0xeb, UPDATE_FINISH = 0xea
+} host_update_action;
+
+typedef enum {IDLE, BUSY, UPDATE, SEND} device_state;
+
+_Bool start_flag;
+_Bool chirp_flag;
+_Bool update_flag;
+uint16_t wait_timer_val;
+uint16_t wait_timer_prescaler;
+uint16_t nchunks;
+device_state dstate;
+
+// D10 --> PA20
+const ml_pin_settings amp_pin = {PORT_GRP_A, 20, PF_A, PP_EVEN, OUTPUT_PULL_DOWN, DRIVE_ON};
+// A0 --> PA02
+const ml_pin_settings dac_pin = {PORT_GRP_A, 2, PF_B, PP_EVEN, ANALOG, DRIVE_ON};
+// A2 --> PB08 (ADC0, AIN2, listenR)
+const ml_pin_settings adc0_pin = {PORT_GRP_B, 8, PF_B, PP_EVEN, ANALOG, DRIVE_OFF};
+// A3 --> PB09 (ADC1, AIN1, listenL)
+const ml_pin_settings adc1_pin = {PORT_GRP_B, 9, PF_B, PP_ODD, ANALOG, DRIVE_OFF};
+// D11 --> PA21
+const ml_pin_settings tcc0_pin = {PORT_GRP_A, 21, PF_G, PP_ODD, OUTPUT_PULL_DOWN, DRIVE_OFF};
+
+#define AMP_DISABLE() (logical_set(&amp_pin))
+#define AMP_ENABLE() (logical_unset(&amp_pin))
+
 // One buffer holds chirp (supplied by host), and both listen buffers
 static volatile uint16_t data_buffer[MAX_BUFFER_LENGTH];
 /*
@@ -102,12 +172,6 @@ void partition_data_buffer(uint16_t clen, uint16_t rlen, uint16_t llen)
   event_selector = ((uint8_t)do_right << 1) | ((uint8_t) do_left << 0);
 }
 
-static DmacDescriptor base_descriptor[3] __attribute__((aligned(16)));
-static volatile DmacDescriptor wb_descriptor[3] __attribute__((aligned(16)));
-
-#define CHIRP_DMAC_CHANNEL 0x00
-#define LISTEN_R_DMAC_CHANNEL 0x01
-#define LISTEN_L_DMAC_CHANNEL 0x02
 
 // can only be called in update state (no active transfers)
 // needs to be called AFTER calling partition_data_buffer in update chain
@@ -185,14 +249,6 @@ const uint16_t listenL_dmac_descriptor_settings =
   DMAC_BTCTRL_VALID
 );
 
-#define WAIT_TIMER_START_CHANNEL 0x00
-#define EXIT_TIMER_A_START_CHANNEL 0x01
-#define EXIT_TIMER_B_START_CHANNEL 0x02
-#define LISTEN_R_START_CHANNEL 0x03
-#define LISTEN_L_START_CHANNEL 0x04
-#define CHIRP_START_CHANNEL 0x05
-
-#define EVSYS_ID_GEN_NONE 0x00
 
 typedef struct _ev_sel_s 
 {
@@ -326,9 +382,9 @@ void init_dmac_descriptors(void)
     &base_descriptor[LISTEN_L_DMAC_CHANNEL]
   );
 
-  DMAC_channel_intenset((ml_dmac_chnum_t)CHIRP_DMAC_CHANNEL, DMAC_0_IRQn, DMAC_CHINTENSET_TCMPL, 1);
-  DMAC_channel_intenset((ml_dmac_chnum_t)LISTEN_R_DMAC_CHANNEL, DMAC_1_IRQn, DMAC_CHINTENSET_TCMPL, 1);
-  DMAC_channel_intenset((ml_dmac_chnum_t)LISTEN_L_DMAC_CHANNEL, DMAC_2_IRQn, DMAC_CHINTENSET_TCMPL, 1);
+  //DMAC_channel_intenset((ml_dmac_chnum_t)CHIRP_DMAC_CHANNEL, DMAC_0_IRQn, DMAC_CHINTENSET_TCMPL, 1);
+  //DMAC_channel_intenset((ml_dmac_chnum_t)LISTEN_R_DMAC_CHANNEL, DMAC_1_IRQn, DMAC_CHINTENSET_TCMPL, 1);
+  //DMAC_channel_intenset((ml_dmac_chnum_t)LISTEN_L_DMAC_CHANNEL, DMAC_2_IRQn, DMAC_CHINTENSET_TCMPL, 1);
 }
 
 void init_wait_timer(void)
@@ -463,84 +519,37 @@ void enable_peripherals(void)
   TCC_enable(TCC1);
 }
 
-typedef enum 
-{
-  NO_ACT = 0xff, START_JOB = 0xfe, AMP_ENABLE = 0xfd, 
-  AMP_DISABLE = 0xfb, UPDATE_JOB = 0xfa
-} host_action;
-
-typedef enum
-{
-  UPDATE_BUFFER = 0xef, UPDATE_CHIRP = 0xed, UPDATE_WAIT_TIMER_PERIOD = 0xec,
-  UPDATE_WAIT_TIMER_PRESCALER = 0xeb, UPDATE_FINISH = 0xea
-} host_update_action;
-
-// D10 --> PA20
-const ml_pin_settings amp_pin = {PORT_GRP_A, 20, PF_A, PP_EVEN, OUTPUT_PULL_DOWN, DRIVE_ON};
-// A0 --> PA02
-const ml_pin_settings dac_pin = {PORT_GRP_A, 2, PF_B, PP_EVEN, ANALOG, DRIVE_ON};
-// A2 --> PB08 (ADC0, AIN2, listenR)
-const ml_pin_settings adc0_pin = {PORT_GRP_B, 8, PF_B, PP_EVEN, ANALOG, DRIVE_OFF};
-// A3 --> PB09 (ADC1, AIN1, listenL)
-const ml_pin_settings adc1_pin = {PORT_GRP_B, 9, PF_B, PP_ODD, ANALOG, DRIVE_OFF};
-// D11 --> PA21
-const ml_pin_settings tcc0_pin = {PORT_GRP_A, 21, PF_G, PP_ODD, OUTPUT_PULL_DOWN, DRIVE_OFF};
-
-#define AMP_DISABLE() (logical_set(&amp_pin))
-#define AMP_ENABLE() (logical_unset(&amp_pin))
-
-typedef struct _run_data
-{
-  _Bool start_flag;
-  _Bool chirp_flag;
-  _Bool update_flag;
-  uint16_t wait_timer_val;
-  uint8_t wait_timer_prescaler;
-  uint16_t nchunks;
-} run_data;
-
-#define S_ACK 0x55
-#define S_UPDATE_COMPLETE 0x56
-
-#define SERIAL_WRITE_ACK() (Serial.write(S_ACK))
-#define SERIAL_WRITE_UPDATE_COMPLETE() (Serial.write(S_UPDATE_COMPLETE))
-
-#define COMMAND 0x44
-#define DATA 0x45
-
-#define READ_HALF_WORD() ((uint16_t)Serial.read() << 8 | (uint16_t)Serial.read())
-#define SERIAL_COMMAND_AVAILABLE() (Serial.available() && Serial.read() == COMMAND)
-#define SERIAL_DATA_AVAILABLE() (Serial.available() && SERIAL.read() == DATA)
-
-void handle_serial_command(run_data *msg)
+void handle_serial_command(void)
 {
   host_action action = (host_action)Serial.read();
 
-  msg->chirp_flag = false;
-  msg->start_flag = false;
-  msg->update_flag = false;
+  chirp_flag = false;
+  start_flag = false;
+  update_flag = false;
   
   switch(action)
   {
     case START_JOB:
     {
-      msg->chirp_flag = (_Bool)Serial.read();
-      msg->start_flag = true;
+      chirp_flag = (_Bool)Serial.read();
+      start_flag = true;
       break;
     }
     case UPDATE_JOB:
     {
-      msg->update_flag = true;
+      update_flag = true;
       break;
     }
     case AMP_ENABLE:
     {
       AMP_ENABLE();
+      DOTSTAR_SET_GREEN();
       break;
     }
     case AMP_DISABLE:
     {
       AMP_DISABLE();
+      DOTSTAR_SET_GREEN();
       break;
     }
     default:
@@ -550,19 +559,17 @@ void handle_serial_command(run_data *msg)
   }
 }
 
-#define SERIAL_CHUNK_SIZE 64
-
 uint16_t determine_chunk_size(void)
 {
-  uint16_t num_chunks = 2*listen_len/SERIAL_CHUNK_SIZE;
-  if((2*listen_len) % SERIAL_CHUNK_SIZE)
+  uint16_t num_chunks = 2*listen_len/S_CHUNK_SIZE;
+  if((2*listen_len) % S_CHUNK_SIZE)
   {
     num_chunks++;
   }
   return num_chunks;
 }
 
-void handle_serial_update_command(host_update_action action, run_data *msg)
+void handle_serial_update_command(host_update_action action)
 {
   switch(action)
   {
@@ -574,15 +581,14 @@ void handle_serial_update_command(host_update_action action, run_data *msg)
       while(Serial.available() < 6)
       {}
 
-      clen = READ_HALF_WORD();
-      rlen = READ_HALF_WORD();
-      llen = READ_HALF_WORD();
-      //msg->nchunks = READ_HALF_WORD();
+      clen = S_READ_HALF_WORD();
+      rlen = S_READ_HALF_WORD();
+      llen = S_READ_HALF_WORD();
 
       disable_event_inputs();
       partition_data_buffer(clen, rlen, llen);
       update_transfer_descriptors();
-      msg->nchunks = determine_chunk_size();
+      nchunks = determine_chunk_size();
 
       update_event_generators();
 
@@ -592,7 +598,10 @@ void handle_serial_update_command(host_update_action action, run_data *msg)
 
     case UPDATE_CHIRP:
     {
-      if(Serial.read() == DATA)
+      while(Serial.available() < 1)
+      {}
+
+      if(S_READ_BYTE() == S_DATA)
       {
         char *dptr = (char *)base_chirp_ptr;
         Serial.readBytes(dptr, 2 * chirp_len);
@@ -603,33 +612,32 @@ void handle_serial_update_command(host_update_action action, run_data *msg)
     
     case UPDATE_WAIT_TIMER_PERIOD:
     {
-      while(Serial.available() < 2);
-      msg->wait_timer_val = READ_HALF_WORD();
-      TCC_set_period(TCC1, msg->wait_timer_val);
+      while(Serial.available() < 2)
+      {}
+
+      wait_timer_val = S_READ_HALF_WORD();
+      TCC_set_period(TCC1, wait_timer_val);
       break;
     }
 
     case UPDATE_WAIT_TIMER_PRESCALER:
     {
-      while(Serial.available() < 1);
-      msg->wait_timer_prescaler = Serial.read();
-      TCC_update_prescaler(TCC1, msg->wait_timer_prescaler);
+      while(Serial.available() < 1)
+      {}
+
+      wait_timer_prescaler = S_READ_BYTE();
+      TCC_update_prescaler(TCC1, wait_timer_prescaler);
       break;
     }
 
     case UPDATE_FINISH:
     {
-      msg->update_flag = false;
+      update_flag = false;
       break;
     }
 
   }
 }
-
-typedef enum {IDLE, BUSY, UPDATE, SEND} device_state;
-
-device_state dstate;
-run_data msg;
 
 void setup(void)
 {
@@ -642,7 +650,11 @@ void setup(void)
   // init amp enable pin and pull high (disables amp)
   peripheral_port_init(&amp_pin);
   port_pmux_disable(&amp_pin);
+
+  dotstar_init();
+
   AMP_DISABLE();
+  DOTSTAR_SET_BLUE();
 
   // DMAC init
   // zero data buffer
@@ -657,7 +669,7 @@ void setup(void)
   update_event_generators();
   init_dmac_descriptors();
 
-  msg.nchunks = determine_chunk_size();
+  nchunks = determine_chunk_size();
 
   ML_DMAC_ENABLE();
 
@@ -696,7 +708,7 @@ void setup(void)
   ADC_flush(ADC0);
   ADC_flush(ADC1);
 
-  uint32_t rdy = EVSYS->READYUSR.reg;
+  //uint32_t rdy = EVSYS->READYUSR.reg;
 
   TCC_enable(TCC1);
   //TCC_unlock_update(TCC1);
@@ -704,12 +716,6 @@ void setup(void)
   TC_enable(TC1);
 
   dstate = IDLE;
-
-  //EVSYS->SWEVT.bit.CHANNEL0 = 0x01;
-  //TCC1->CTRLBSET.bit.CMD = TCC_CTRLBSET_CMD_RETRIGGER_Val;
-  //while(TCC1->SYNCBUSY.bit.CTRLB);
-  //EVSYS->SWEVT.bit.CHANNEL0 = 0x01;
-  //EVSYS->SWEVT.bit.CHANNEL5 = 0x01;
 }
 
 _Bool exit_intflag_A = false;
@@ -727,35 +733,28 @@ _Bool checkB = false;
 
 void loop(void)
 {
-/*
-  if(checkA & checkB & check)
-  {
-    SERIAL_WRITE_ACK();
-    checkA = checkB = false;
-    check = false;
-  }*/
   switch(dstate)
   {
     case IDLE: 
     {
-      if(SERIAL_COMMAND_AVAILABLE())
+      if(S_COMMAND_AVAILABLE())
       {
-        handle_serial_command(&msg);
+        handle_serial_command();
 
-        if(msg.update_flag)
+        if(update_flag)
         {
           dstate = UPDATE;
           disable_peripherals();
           //SERIAL_WRITE_ACK();
         }
 
-        else if(msg.start_flag)
+        else if(start_flag)
         {
-          if(msg.chirp_flag)
+          if(chirp_flag)
           {
-            EVSYS->SWEVT.bit.CHANNEL5 = 0x01;
+            CHIRP_START_SOFT_TRIGGER();
           }
-          EVSYS->SWEVT.bit.CHANNEL0 = 0x01;
+          LISTEN_START_SOFT_TRIGGER();
           dstate = BUSY;
         }
       }
@@ -781,18 +780,17 @@ void loop(void)
 
     case UPDATE:
     {
-      if(SERIAL_COMMAND_AVAILABLE())
+      if(S_COMMAND_AVAILABLE())
       {
         host_update_action action = (host_update_action)Serial.read();
         //SERIAL_WRITE_ACK();
+        handle_serial_update_command(action);
 
-        handle_serial_update_command(action, &msg);
-
-        if(!msg.update_flag)
+        if(!update_flag)
         {
           enable_peripherals();
           dstate = IDLE;
-          SERIAL_WRITE_UPDATE_COMPLETE();
+          S_WRITE_UPDATE_COMPLETE();
           check = true;
         }
       }
@@ -804,9 +802,9 @@ void loop(void)
       if(Serial.availableForWrite())
       {
         uint8_t *cptr = (uint8_t *)base_listen_ptr;
-        for(uint16_t i=0; i < msg.nchunks; i++, cptr += SERIAL_CHUNK_SIZE)
+        for(uint16_t i=0; i < nchunks; i++, cptr += S_CHUNK_SIZE)
         {
-          Serial.write(cptr, sizeof(uint8_t) * SERIAL_CHUNK_SIZE);
+          Serial.write(cptr, sizeof(uint8_t) * S_CHUNK_SIZE);
         }
         dstate = IDLE;
       }
