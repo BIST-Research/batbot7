@@ -130,48 +130,31 @@ class SonarController:
         self.Fs = SAMPLING_RATE
         self.Ts = 1/SAMPLING_RATE
         
-        chirp_book = sonar_book['chirp']
-        
-        # Commandline or GUI override -- will not chirp
-        # if specified in configuration
-        self.do_chirp = bool(sonar_book['do_chirp'])
-        
-        # Starting chirp frequency
-        f0 = int(chirp_book['f0'])
-        # End chirp frequency
-        f1 = int(chirp_book['f1'])
-        # chirp method, usually linear
-        chirp_method = chirp_book['method']
-        # Type of window to apply to chirp, typically hann
-        window = chirp_book['window']
-        
-        self.chirp_settings = (f0, f1, chirp_method, window)
-                
-        listen_book = sonar_book['listen']
-        
-        # Amount of time to wait between emitting chirp
-        # and opening recording period
-        self.T_wait, self.TOP_wait, self.Preg_wait, self.P_wait = determine_timer_vals(float(listen_book['wait_time']))
-        
-        # Check to make sure number of samples will fit into the data buffer
-        # This must be enforced here, because microcontroller does not check
-        valid_N, self.N, self.N_listen, self.N_chirp, self.N_listenR, self.N_listenL = check_partition(int(chirp_book['length']), int(listen_book['lengthR']), int(listen_book['lengthL']))
-
-        if not valid_N:
-            self.bat_log.critical(f"Invalid partition scheme! Defaulted.")
-
-        self.refresh_listen_times()
-        # tuple containing time vector, window, and chirp vector
-        self.tv_chirp, self.win_chirp, self.v_chirp = generate_chirp(f0, f1, self.T_chirp, self.N_chirp, self.Ts, method=chirp_method, window=window)
-        
-
-        self.N_chunks = determine_chunk_count(self.N_listen)
-        
         # indicates whether MCU is in update condition or not
         self.updating = False
         # indicates whether a job is in process
         self.running = False
-
+            
+        self.load_defaults()
+        self.bat_log.info("[Sonar] controller ready")
+        
+    def load_defaults(self):
+        self.enter_update()
+        self.buffer_update(DEFAULT_CHIRP_LEN, DEFAULT_LISTEN_LEN, DEFAULT_LISTEN_LEN)
+        
+        self.T_wait, self.TOP_wait, self.Preg_wait, self.P_wait = determine_timer_vals(DEFAULT_T_WAIT)
+        self.wait_timer_update(DEFAULT_T_WAIT)
+        
+        default_chirp = (DAC_MAX_INT/2)*(np.ones(DEFAULT_CHIRP_LEN))
+        with open('default_chirp.npy', 'rb') as fp:
+            default_chirp = np.load(fp)
+        
+        self.chirp_update(list(default_chirp))
+        self.exit_update()
+            
+        self.refresh_listen_times()
+        self.bat_log.info("[Sonar] Loaded defaults.")
+        
     # update time periods depending on num samples / timer vals
     def refresh_listen_times(self):
         self.T_chirp = self.N_chirp/self.Fs
@@ -179,12 +162,6 @@ class SonarController:
         self.T_listenL = self.N_listenL/self.Fs
         self.T_listen = self.T_listenR + self.T_listenL
         self.T = self.T_listen + self.T_chirp
-        
-    def amp_enable(self):
-        self.m4.write([SOP_COMMAND, OP_AMP_ENABLE])
-    
-    def amp_disable(self):
-        self.m4.write([SOP_COMMAND, OP_AMP_DISABLE])
     
     # enter_update must be called before any update_* functions
     def enter_update(self):
@@ -194,6 +171,7 @@ class SonarController:
         self.m4.write([SOP_COMMAND, OP_UPDATE_JOB])
         self.updating = True
         return True
+
     # b_array can be supplied if computed beforehand. Otherwise we have
     # check for validity and convert lengths into a byte array
     def buffer_update(self, clen, rlen, llen, b_array=None):
