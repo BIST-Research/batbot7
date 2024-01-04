@@ -12,8 +12,8 @@ sudo sdm \
 	--plugin user:"addgroup=batrun" \
 	--plugin user:"adduser=batbot|password=batbot2023|groupadd=batrun" \
 	--plugin user:"adduser=sftp_batbot|password=batbot2023|groupadd=batrun,sftp" \
-	--plugin network:"netman=nm|nmconn=westcottwifi.nmconnection" \
+	--plugin network:"netman=nm|nmconn=basic_conn.nmconnection" \
 	--plugin L10n:host \
-	--plugin apps:"@sdm-apps.txt|name=apps" \
+	--plugin apps:"apps=@sdm-apps.txt|name=apps" \
 	--plugin raspiconfig:"spi=1|serial=1|net_names=1|rgpio=1" \
 	--reboot 20

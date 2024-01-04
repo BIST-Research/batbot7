@@ -24,7 +24,6 @@ from bb_sonar import part_default
 from hw_defs import *
 
 def init_board(bat_log):
-    
     sonar = None
     with open('test_bat_conf.yaml') as fd:
         conf = yaml.safe_load(fd)

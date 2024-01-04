@@ -44,8 +44,8 @@ else
 	alias py3=/home/batbot/pyvenv/bin/python3
 
 	# install required python modules
-	py3 -m pip install matplotlib scipy numpy pyyaml pyserial
-	py3 -m pip install pygnssutils gpxpy
+	python3 -m pip install matplotlib scipy numpy pyyaml pyserial
+	python3 -m pip install pygnssutils gpxpy
 
 	# setup sftp
 	echo "Match group sftp" >> /etc/ssh/sshd_config

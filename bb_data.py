@@ -43,7 +43,6 @@ class DataController:
             os.makedirs(self.data_dir)
             
     def create_run_dir(self, suffix=None):
-    
         run_dir = f"{get_timestamp_now()}"
         if suffix is not None:
             run_dir += f"_{str(suffix)}"
