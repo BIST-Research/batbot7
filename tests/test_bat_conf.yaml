@@ -20,27 +20,8 @@ sonar_boards:
     - "6A3E92CE5351523450202020FF0E4431"
     
 sonar_baud: 115200
-    
-sonar:
-    sampling_period: 1.0E-6
-
-    do_chirp: true
-    chirp:
-        f0: 120000
-        f1: 10000
-        length: 3000
-        method: "linear"
-        window:  "hann"
-    
-    do_listen: true
-    listen:
-        wait_time: 0.5E-6
-        lengthR: 30000
-        lengthL: 30000
-        
 
 sonar_plot:
-
     spec_color_map: 'jet'
     update_interval: 1
     calibration_interval: 10

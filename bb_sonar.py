@@ -121,7 +121,7 @@ def determine_timer_vals(T_out):
         
 class SonarController:
 
-    def __init__(self, sonar_book, m4, bat_log):
+    def __init__(self, m4, bat_log):
     
         self.bat_log = bat_log
         self.m4 = m4

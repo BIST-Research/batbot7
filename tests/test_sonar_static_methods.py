@@ -72,49 +72,7 @@ class TestSonarStaticMethods(unittest.TestCase):
             pass
             
 
-            
 
-def basic_sonar_test():
-    bat_log = bb_log.get_log()
-    
-    with open('test_bat_conf.yaml') as fd:
-        conf = yaml.safe_load(fd)
-        sonar_book = conf['sonar']
-        
-        sonar_m4 = m4.M4(conf['sonar_boards'], conf['sonar_baud'], bat_log)
-        
-        sonar = SonarController(sonar_book, sonar_m4, bat_log)
-        
-        sonar.enter_update()
-        sonar.buffer_update(3000, 30000, 0)
-        sonar.exit_update()
-        
-        sonar.start_job(do_chirp=True)
-        
-        buf = sonar.get_job()
-        while buf is None:
-            buf = sonar.get_job()
-            
-        print(len(buf))
-        sonar.enter_update()
-        sonar.buffer_update(0, 10000, 30000)
-        sonar.exit_update()
-        
-        sonar.start_job(do_chirp=False)
-        
-        buf = sonar.get_job()
-        while buf is None:
-            buf = sonar.get_job()
-            
-        print(len(buf))
-        
-        for n in range(0, 20):
-            sonar.start_job()
-            data = sonar.get_job()
-            while data is None:
-                data = sonar.get_job()
-            print(f"{n}, ")    
-            
 if __name__ == '__main__':
     
     basic_sonar_test()

@@ -9,6 +9,9 @@ import m4
 import yaml
 
 from bb_utils import get_timestamp_now
+        
+        
+    
 
 class DataController:
     
@@ -25,13 +28,12 @@ class DataController:
             self.bat_log.critical(f"Please check if your configuration file exists and is parseable!")
             exit()
             
-        self.bat_log.debug(f"Found {conf_name}, loading settings...")
+        self.bat_log.info(f"[Data] Found {conf_name}, loading settings...")
         
-        self.sonar_boards = list(conf['sonar_boards'])
-        self.sonar_baud = int(conf['sonar_baud'])
-        self.do_plot = bool(conf['do_plot'])
+        self.sonar_boards = conf['sonar_boards']
+        self.sonar_baud = conf['sonar_baud']
+        self.do_plot = conf['do_plot']
         
-        self.sonar_book = conf['sonar']
         self.sonar_plot_book = conf['sonar_plot']
         self.gps_book = conf['gps']
         
@@ -39,7 +41,7 @@ class DataController:
         self.data_dir = parent_directory + f"/{str(conf['data_directory'])}"
         
         if not os.path.exists(self.data_dir):
-            bat_log.debug(f"Creating root data path... ")
+            bat_log.debug(f"[Data] Creating root data path... ")
             os.makedirs(self.data_dir)
             
     def create_run_dir(self, suffix=None):
@@ -68,14 +70,14 @@ class DataController:
     def get_sonar_baud(self):
         return self.sonar_baud
         
-    def get_sonar_book(self):
-        return self.sonar_book
-        
     def get_sonar_plot_book(self):
         return self.sonar_plot_book
         
     def get_gps_book(self):
         return self.gps_book
+        
+    def get_data_directory(self):
+        return self.data_dir
         
         
 if __name__ == '__main__':

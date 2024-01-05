@@ -27,10 +27,9 @@ def init_board(bat_log):
     sonar = None
     with open('test_bat_conf.yaml') as fd:
         conf = yaml.safe_load(fd)
-        sonar_book = conf['sonar']
         
         sonar_m4 = m4.M4(conf['sonar_boards'], conf['sonar_baud'], bat_log)
-        sonar = SonarController(sonar_book, sonar_m4, bat_log)
+        sonar = SonarController(sonar_m4, bat_log)
         
         fd.close()
     return sonar

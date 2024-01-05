@@ -35,7 +35,7 @@ class M4:
             
         self.device = serial.Serial(self.port.device, baud_rate)
         
-        bat_log.info(f"Found {self.port.serial_number} on {self.port.device}")
+        bat_log.info(f"[Serial] Found {self.port.serial_number} on {self.port.device}")
 
         #self.reset()
         
