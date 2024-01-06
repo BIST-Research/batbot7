@@ -249,7 +249,6 @@ const uint16_t listenL_dmac_descriptor_settings =
   DMAC_BTCTRL_VALID
 );
 
-
 typedef struct _ev_sel_s 
 {
   uint32_t wait_gen;
@@ -685,9 +684,10 @@ void setup(void)
   // DAC init
   DAC_init();
   DAC0_init();
+  //dac_old_init();
   peripheral_port_init(&dac_pin);
-  DAC_enable();
   DAC0_enable();
+  DAC_enable();
 
   // DAC timer init
   TCC2_init();
@@ -714,6 +714,8 @@ void setup(void)
   //TCC_unlock_update(TCC1);
   TC_enable(TC0);
   TC_enable(TC1);
+
+  //memset((void *)&data_buffer[0], 0x800, sizeof(uint16_t) * DEFAULT_CHIRP_LENGTH);
 
   dstate = IDLE;
 }

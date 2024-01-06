@@ -236,7 +236,7 @@ class SonarController:
         if TOP != self.TOP_wait:
             self.m4.write([SOP_COMMAND, UOP_WAIT_TIMER_TOP])
             b = list2bytearr([TOP], 2)
-            print(f"TOP: {b}\n")
+            #print(f"TOP: {b}\n")
             self.m4.write(list2bytearr([TOP], 2))
             self.TOP_wait = TOP
             
