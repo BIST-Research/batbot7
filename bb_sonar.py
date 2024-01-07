@@ -15,6 +15,9 @@ from datetime import datetime
 from bb_utils import bin2dec
 from bb_utils import list2bytearr
 
+from threading import Thread
+from queue import Queue
+
 import bb_log
 import m4
 import yaml
@@ -118,6 +121,56 @@ def determine_timer_vals(T_out):
             return (T_out, int(TOP), PRESCALER_REG_VALS[i], PRESCALERS[i])
             
     return (None, None, None, None)
+    
+class SonarThread(Thread):
+    def __init__(self, run_queue, data_queue, Sonar, exit_cond):
+        Thread.__init__(self)
+        self.run_q = run_queue
+        self.data_q = data_queue
+        self.Sonar = Sonar
+        self.exit_cond = exit_cond
+        
+    def run(self):
+        RUN = 0x01
+        UPDATE = 0x02
+        curr_operation = None
+        t_start = 0
+        
+        while True:
+            
+            if self.exit_cond() and self.run_q.empty():
+                break
+            
+            if not self.run_q.empty() and curr_operation is None:
+                update, do_chirp, wait_T, partition, chirp = self.run_q.get()
+                
+                if update:
+                    curr_operation = UPDATE
+                    # TODO: Should probably send an "update ready flag" from MCU
+                    self.Sonar.enter_update()
+                else:
+                    curr_operation = RUN
+                    self.Sonar.start_job(do_chirp=do_chirp)
+                    t_start = time.time()
+                    
+            if curr_operation == RUN:
+                if data := self.Sonar.get_job() is not None:
+                    self.data_q.put((data, time.time()  - t_start))
+                    self.run_q.task_done()
+                    curr_operation = None
+                    
+            elif curr_operation == UPDATE:
+                
+                if wait_T:
+                    self.Sonar.wait_timer_update(wait_T)
+                if partition:
+                    self.Sonar.buffer_update(partition[0], partition[1], partition[2])
+                if chirp:
+                    self.Sonar.chirp_update(chirp)
+                    
+                self.Sonar.exit_update()
+                self.run_q.task_done()
+                curr_operation = None
         
 class SonarController:
 
@@ -198,7 +251,7 @@ class SonarController:
         self.N_chunks = determine_chunk_count(self.N_listen)
                 
         return True
-    
+            
     # enforce the length of the buffer before calling
     # I didnt want to deal with padding if length < N_chirp
     # because zero padding would produce harmonics and

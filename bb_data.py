@@ -9,9 +9,42 @@ import m4
 import yaml
 
 from bb_utils import get_timestamp_now
-        
-        
+from threading import Thread
+
+write_npy_fun = lambda s,d,su: write_npy(s,d, su)
+
+def write_npy(save_path, data, suffix=None):
     
+    path = f"{save_path}/{get_timestamp_now()}"
+    if suffix is not None:
+        path += f"_{str(suffix)}"
+        
+    path += ".npy"
+        
+    with open(path, 'wb') as fd:
+        np.save(fd, np.array(data))
+        fd.close()
+        
+class DataThread(Thread):
+    def __init__(self, write_queue, exit_cond):
+        Thread.__init__(self)
+        self.q = write_queue
+        self.exit_cond = exit_cond
+        
+    def run(self):
+        
+        while True:
+            if self.exit_cond() and self.q.empty():
+                break
+        
+            if not self.q.empty():
+                data, data_suffix, save_path, write_fun = self.q.get()
+                
+                write_fun(save_path, data, data_suffix)
+                self.q.task_done()
+            
+            else:
+                time.sleep(0.01)
 
 class DataController:
     
@@ -51,18 +84,6 @@ class DataController:
         
         os.makedirs(self.data_dir + "/" + run_dir)
         return run_dir
-        
-    def dump_as_npy(self, dir_name, data, suffix=None):
-    
-        path = f"{self.data_dir}/{dir_name}/{get_timestamp_now()}"
-        if suffix is not None:
-            path += f"_{str(suffix)}"
-        
-        path += ".npy"
-        
-        with open(path, 'wb') as fd:
-            np.save(fd, np.array(data))
-            fd.close()
             
     def get_sonar_boards(self):
         return self.sonar_boards
