@@ -38,7 +38,8 @@ if __name__ == '__main__':
     write_exit = False
     
     #run_queue = Queue(maxsize=1000)
-    run_queue, nruns, interval = test_queues.long_test_no_mic()
+    #run_queue, nruns, interval = test_queues.long_test_no_mic()
+    run_queue, nruns, interval = test_queues.many_partition_test()
     data_queue = Queue(maxsize=1000)
     sonar_exit = False
         
@@ -65,15 +66,16 @@ if __name__ == '__main__':
     t_start = time.time()
         
     while nidx < nruns + 1:
-        
+    
+    
         if not data_queue.empty():
             data, t = data_queue.get()
-            write_queue.put((data, t, full_save_path, write_npy_fun))
             data_queue.task_done()
+            write_queue.put((data, t, full_save_path, write_npy_fun))
             nidx += 1
             
             if nidx % interval == 0:
-                bat_log.info(f"[Sonar] got run {nidx}. took {time.time() - t_start}")
+                bat_log.info(f"[Sonar] got run {nidx - 1}. took {time.time() - t_start}")
                 t_start = time.time()
             
     sonar_exit = True

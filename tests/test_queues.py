@@ -58,4 +58,18 @@ def long_test_no_mic():
         ret.put(RUN_W_CHIRP)
     
     return ret, nruns, status_interval
+    
+def many_partition_test():
+    ret = Queue(maxsize=1000)
+    
+    listen_vec = reversed(range(5000, 10000, 50))
+    nruns = 200
+    status_interval = 1
+    
+    for n in listen_vec:
+        ret.put((True, False, 1E-6, (3000, n, n), None))
+        ret.put(RUN_W_CHIRP)
+        ret.put(RUN_WO_CHIRP)
+                
+    return ret, nruns, status_interval
         

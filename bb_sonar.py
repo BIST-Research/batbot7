@@ -91,6 +91,7 @@ def determine_chunk_count(length):
     if blen % S_CHUNK_LENGTH:
         cnt = cnt + 1
     return cnt
+    
 
 # Max freq: TCC1_GCLK_FREQ/(1024 * TCC_MAX_TOP) = 120MHz/(1024 * 65535) = 1.788 Hz
 # Max period = 1/1.788 = 0.559 sec
@@ -137,7 +138,7 @@ class SonarThread(Thread):
         t_start = 0
         
         while True:
-            
+                    
             if self.exit_cond() and self.run_q.empty():
                 break
             
@@ -154,7 +155,8 @@ class SonarThread(Thread):
                     t_start = time.time()
                     
             if curr_operation == RUN:
-                if data := self.Sonar.get_job() is not None:
+                data = self.Sonar.get_job()
+                if data is not None and type(data) is not bool:
                     self.data_q.put((data, time.time()  - t_start))
                     self.run_q.task_done()
                     curr_operation = None
@@ -222,6 +224,9 @@ class SonarController:
             return False
             
         self.m4.write([SOP_COMMAND, OP_UPDATE_JOB])
+        
+        self.m4.read(1)
+        
         self.updating = True
         return True
 
@@ -354,7 +359,7 @@ class SonarController:
         data = self.m4.read(S_CHUNK_LENGTH * self.N_chunks)
         
         self.running = False
-        return data
+        return data[0:2*self.N_listen]
         
     def amp_enable(self):
         self.m4.write([SOP_COMMAND, OP_AMP_ENABLE])

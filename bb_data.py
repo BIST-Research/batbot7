@@ -77,10 +77,15 @@ class DataController:
             bat_log.debug(f"[Data] Creating root data path... ")
             os.makedirs(self.data_dir)
             
-    def create_run_dir(self, suffix=None):
+    def create_run_dir(self, suffix=None, prefix=None):
+        run_dir = ""
+        if prefix is not None:
+            run_dir += f"{prefix}_"
+        
         run_dir = f"{get_timestamp_now()}"
         if suffix is not None:
             run_dir += f"_{str(suffix)}"
+            
         
         os.makedirs(self.data_dir + "/" + run_dir)
         return run_dir

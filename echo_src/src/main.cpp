@@ -47,9 +47,11 @@
 #define S_CHUNK_SIZE 64
 #define S_ACK 0x55
 #define S_UPDATE_COMPLETE 0x56
+#define S_UPDATE_ENTER 0x57
 
 #define S_WRITE_ACK() (Serial.write(S_ACK))
 #define S_WRITE_UPDATE_COMPLETE() (Serial.write(S_UPDATE_COMPLETE))
+#define S_WRITE_UPDATE_ENTER() (Serial.write(S_UPDATE_ENTER))
 
 #define S_COMMAND 0x44
 #define S_DATA 0x45
@@ -746,6 +748,7 @@ void loop(void)
         if(update_flag)
         {
           dstate = UPDATE;
+          S_WRITE_UPDATE_ENTER();
           disable_peripherals();
           //SERIAL_WRITE_ACK();
         }
