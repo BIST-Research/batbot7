@@ -26,3 +26,11 @@ def list2bytearr(lst, order):
     
     return byterr
 
+def blist2bytearr(lst, order):
+    byterr = bytearray()
+    for num in lst:
+        b = int(num).to_bytes(order, byteorder='big')
+        for o in reversed(range(0, order)):
+            byterr.append(b[o])
+    
+    return byterr
