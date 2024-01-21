@@ -10,9 +10,26 @@ SER_FRAME_END = 0x7f
 SER_ESC = 0x7D
 SER_XOR = 0x20
 
+USART_BAUD = 115200
+
+TX_ERR = 0x40
+TX_NONE = 0x41
+TX_MSG_FRAME = 0x42
+TX_DATA_FRAME = 0x43
+
+TX_FLAG = 0x50
+RX_FLAG = 0x51
+EMITTER_FLAG = 0x10
+RECORDER_FLAG = 0x11
+
+TX_EMITTER_FLAG = (TX_FLAG << 8) | EMITTER_FLAG
+RX_EMITTER_FLAG = (RX_FLAG << 8) | EMITTER_FLAG
+
+TX_RECORDER_FLAG = (TX_FLAG << 8) | RECORDER_FLAG
+RX_RECORDER_FLAG = (RX_FLAG << 8) | RECORDER_FLAG
+
 # bytes
 BUF_LEN = 256
-
 RAW_BUF_LEN = 515
 
 def pad_msg(msg):
@@ -26,7 +43,8 @@ def pad_msg(msg):
 def encode_msg(msg):
     #msg = pad_msg(msg)
     
-    out = [SER_FRAME_START]
+    out = bytearray()
+    out.append(SER_FRAME_START)
     
     for n in range(0, len(msg)):
         b = msg[n]
@@ -77,10 +95,6 @@ def decode_msg(msg):
 # order = 1 = sizof(uint8_t)
 # order = 2 = sizeof(uint16_t)
 # ...
-# MCU sends listen data in chunks of 64 bytes, so
-# if 64 doesnt divide the length, then add an
-# additional chunk. When data is received,
-# prune it to length
 def determine_num_chunks(buflen, order=1):
     buflen = order*buflen
     nchunks = buflen // BUF_LEN

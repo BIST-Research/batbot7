@@ -75,7 +75,7 @@ uint8_t decode_frame(uint8_t src[SER_RAW_BUF_LEN], uint8_t dst[SER_BUF_LEN])
     uint8_t *rptr = src;
     uint8_t *wptr = tmp_buffer;
 
-    uint16_t n=0;
+    uint16_t n = 0;
 
     uint8_t rx_frame_type = RX_ERR;
 
@@ -125,7 +125,6 @@ uint8_t w_read_loop(uint8_t dst[SER_BUF_LEN])
 {
     static uint8_t raw_buf[SER_RAW_BUF_LEN];
     static uint16_t frame_idx = 0;
-
 
     if(frame_idx == SER_RAW_BUF_LEN)
     {

@@ -20,8 +20,6 @@
 
 static volatile uint16_t record_buffer[2*MAX_BUF_LEN];
 
-//uint8_t tx_buffer[SER_BUF_LEN];
-
 static DmacDescriptor base_descriptor[3] __attribute__((aligned(16)));
 static volatile DmacDescriptor wb_descriptor[3] __attribute__((aligned(16)));
 
