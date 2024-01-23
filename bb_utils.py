@@ -7,7 +7,6 @@ def bin2dec(bin_data):
     return [((y << 8) | x) for x, y in zip(bin_data[::2], bin_data[1::2])]
     
 def split_word(word):
-
     mask = 0x000000ff
     return [(word >> 24) & mask, (word >> 16) & mask, (word >> 8) & mask, (word >> 0) & mask]
     

@@ -99,6 +99,7 @@ uint8_t decode_frame(uint8_t src[SER_RAW_BUF_LEN], uint8_t dst[SER_BUF_LEN])
             {
                 break;
             }
+
             if(b == SER_ESC)
             {
                 state = ESCAPE;
@@ -146,7 +147,6 @@ uint8_t wb_read_loop(uint8_t dst[SER_BUF_LEN])
     if(Serial.available())
     {
         Serial.readBytes((char *)raw_buf, SER_RAW_BUF_LEN);
-        DOTSTAR_SET_PINK();
         return decode_frame(raw_buf, dst);
     }
     return RX_NONE;

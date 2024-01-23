@@ -48,7 +48,7 @@ def encode_msg(msg):
     
     for n in range(0, len(msg)):
         b = msg[n]
-        if b == SER_FRAME_START or b == SER_ESC:
+        if b == SER_FRAME_START or b == SER_ESC or b==SER_FRAME_END:
             out.append(SER_ESC)
             out.append(b ^ SER_XOR)
         else:
@@ -90,7 +90,7 @@ def decode_msg(msg):
             state = ACCEPT
             continue
     
-    return frame_type, decoded          
+    return decoded          
         
 # order = 1 = sizof(uint8_t)
 # order = 2 = sizeof(uint16_t)
@@ -102,4 +102,20 @@ def determine_num_chunks(buflen, order=1):
         nchunks += 1
     return nchunks
     
+def chunk_split(data, size):
+    return np.split(data, np.arange(size, len(data), size))
+    
+def to_chunks(ftype, data, order=1, encode=True):
+    chunks = []
+    for chunk in chunk_split(data, BUF_LEN//order):
+        c = bytearray(chunk)
+        c.insert(0, ftype)
+
+        if encode:
+            c = encode_msg(c)
+        chunks.append(c)
+    
+    return chunks, determine_num_chunks(len(data), order=order)
+
+
 

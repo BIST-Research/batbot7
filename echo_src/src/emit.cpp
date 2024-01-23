@@ -11,6 +11,7 @@
 #include <ml_port.h>
 #include <ml_tcc_common.h>
 #include <ml_tcc2.h>
+#include <ml_eic.h>
 
 // 2**15
 #define EMIT_BUF_LEN 32768
@@ -22,7 +23,7 @@
 #define EMIT_CHANNEL 0x02
 
 // triggers emission
-#define EMIT_SOFT_TRIGGER() (EVSYS->SWEVT.bit.CHANNEL0 = 0x01)
+#define EMIT_SOFT_TRIGGER() (EVSYS->SWEVT.bit.CHANNEL2 = 0x01)
 
 // holds waveform to emit (dma steps through this buffer)
 uint16_t emit_buffer[EMIT_BUF_LEN];
@@ -52,6 +53,8 @@ const ml_pin_settings dac_timer_pin = {PORT_GRP_A, 14, PF_F, PP_EVEN, OUTPUT_PUL
 const ml_pin_settings amp_pin = {PORT_GRP_A, 20, PF_A, PP_EVEN, OUTPUT_PULL_DOWN, DRIVE_ON};
 // A0 --> PA02
 const ml_pin_settings dac_pin = {PORT_GRP_A, 2, PF_B, PP_EVEN, ANALOG, DRIVE_ON};
+
+const ml_pin_settings emit_trigger_pin = {PORT_GRP_A, 16, PF_A, PP_EVEN, INPUT_PULL_DOWN, DRIVE_OFF}; 
 
 #define AMP_DISABLE() (logical_set(&amp_pin))
 #define AMP_ENABLE() (logical_unset(&amp_pin))
@@ -133,7 +136,7 @@ void _emit_dmac_init(void)
 
 void emit_setup(void)
 {
-    DOTSTAR_SET_ORANGE();
+    //DOTSTAR_SET_ORANGE();
 
     DAC_init();
     DAC0_init();
@@ -145,6 +148,13 @@ void emit_setup(void)
     TCC2_init();
     peripheral_port_init(&dac_timer_pin);
     TCC_enable(TCC2);
+
+    OSCULP32K_init();
+    eic_init();
+    hardware_int_init();
+    peripheral_port_init(&emit_trigger_pin);
+    eic_enable();
+
 
     _emit_dmac_init();
 
@@ -181,6 +191,11 @@ uint16_t emit_loop
             n_chunks_cnt++;
         }
 
+        if(rx_frame_type == RX_ERR)
+        {
+            DOTSTAR_SET_RED();
+        }
+
         if(n_chunks_cnt == n_recv_chunks && !chirping)
         {
             // Clear eic interrupt so emission doesnt occur while copying to emit buffer
@@ -199,7 +214,7 @@ uint16_t emit_loop
             
             // Set chirp interrupt after finished updating
             EIC->INTENSET.reg |= (1 << EIC_INTENSET_EXTINT(0));
-            DOTSTAR_SET_GREEN();
+            //DOTSTAR_SET_GREEN();
         }
     }
 
@@ -229,6 +244,8 @@ void EIC_0_Handler(void)
 {
     // clr flags
     EIC->INTFLAG.reg = EIC_INTFLAG_MASK;
+
+    //DOTSTAR_SET_ORANGE();
 
     if(!chirping)
     {
