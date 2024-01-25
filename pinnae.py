@@ -2,12 +2,18 @@
 # author: Mason Lopez
 import numpy as np
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+import spidev
+
 # global variables holding number of motors in A ear
 NUM_PINNAE_MOTORS = 6
 
 # setting the limits on each motor
 DEFAULT_MIN_ANGLE_LIMIT = -180
 DEFAULT_MAX_ANGLE_LIMIT = 180
+
 class PinnaeController():
     def __init__(self) -> None:
         # holds the current angles of the motors
@@ -22,11 +28,13 @@ class PinnaeController():
         self.max_angle_limits[:] = DEFAULT_MAX_ANGLE_LIMIT
         
 
-    def send_angles(self) -> None:
+    def send_MCU_angles(self) -> None:
         """Sends all 6 of the angles to the Grand Central, 
         in a fashion of 2 bytes for each motor angle
 
         """
+        data_buffer = np.zeros(NUM_PINNAE_MOTORS*2,dtype=np.byte)
+
         pass
 
 
@@ -40,7 +48,16 @@ class PinnaeController():
             min (np.int16): new minimun angle in degrees
             max (np.int16): new maximum angle in degrees
         """
-        pass
+        if self.current_angles[motor_index] > max or self.current_angles[motor_index] < min:
+            logging.error("set_motor_limit: new limits out of range for current angle!")
+            return False
+        
+        # set the new limits
+        self.max_angle_limits[motor_index] = max
+        self.min_angle_limits[motor_index] = min
+
+        return True
+        
     
 
     def get_motor_limit(self,motor_index:np.uint8)->np.int16:
@@ -72,10 +89,29 @@ class PinnaeController():
         Returns:
             bool: _description_
         """
-        pass
+        if angle > self.max_angle_limits[motor_index] or angle < self.min_angle_limits[motor_index]:
+            logging.error("set_motor_angle: angle out of limits!")
+            return False
+        
+        # set the angle
+        self.current_angles[motor_index] = angle
+
+        self.send_MCU_angles()
+        return True
+
 
     def set_motor_angles(self,angles:np.int16)->bool:
-        pass
+        assert len(angles) == NUM_PINNAE_MOTORS, f"Expected array to be {NUM_PINNAE_MOTORS}, but got {len(angles)}"
+        
+        # check if values in range
+        if any(angles > self.max_angle_limits) or any(angles < self.min_angle_limits):
+            logging.error("set_motor_angles: angles out of bounds!")
+            return False
+        
+        # set the values
+        self.current_angles[:] = angles[:]
+        self.send_MCU_angles()
+        return True
 
 
     def set_new_zero_position(self,motor_index:np.uint8)->None:
@@ -85,29 +121,41 @@ class PinnaeController():
         Args:
             motor_index (np.uint8): index to reset to zero
         """
+        assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
+        # this has not been implemented yet but will basically send MCU 
         pass
 
     # set motors to max angle
     def set_motor_to_max(self,motor_index:np.uint8)->None:
-        pass
+        assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
+        self.current_angles[motor_index] = self.max_angle_limits[motor_index]
+        self.send_MCU_angles()
+
 
     def set_motors_to_max(self)->None:
-        pass
+        self.current_angles[:] = self.max_angle_limits[:]
+        self.send_MCU_angles()
 
     # set motors to min angle
     def set_motor_to_min(self,motor_index:np.uint8)->None:
-        pass
+        assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
+        self.current_angles[motor_index] = self.min_angle_limits[motor_index]
+        self.send_MCU_angles()
+
 
     def set_motors_to_min(self)->None:
-        pass
+        self.current_angles[:] = self.min_angle_limits[:]
+        self.send_MCU_angles()
 
     # set motors to zero
     def set_motor_to_zero(self,motor_index:np.uint8)->None:
-        pass
-    
-    def set_motors_to_zero(self)->None:
-        pass
+        assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
+        self.current_angles[motor_index] = 0
+        self.send_MCU_angles()
 
+    def set_motors_to_zero(self)->None:
+        self.current_angles[:] = 0
+        self.send_MCU_angles()
     # --------------------------------------------------------------------------------------
     #           Functions for moving the motors
 
