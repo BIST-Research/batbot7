@@ -10,7 +10,7 @@ SER_FRAME_END = 0x7f
 SER_ESC = 0x7D
 SER_XOR = 0x20
 
-USART_BAUD = 115200
+USART_BAUD = 460800
 
 TX_ERR = 0x40
 TX_NONE = 0x41
@@ -90,7 +90,7 @@ def decode_msg(msg):
             state = ACCEPT
             continue
     
-    return decoded          
+    return frame_type, decoded          
         
 # order = 1 = sizof(uint8_t)
 # order = 2 = sizeof(uint16_t)

@@ -12,6 +12,7 @@
 #include <ml_clocks.h>
 #include <ml_dmac.h>
 #include <ml_port.h>
+#include <ml_eic.h>
 
 #define MAX_BUF_LEN 64
 
@@ -134,9 +135,12 @@ const ml_pin_settings adc0_pin = {PORT_GRP_B, 8, PF_B, PP_EVEN, ANALOG, DRIVE_OF
 // A3 --> PB09 (ADC1, AIN1, listenL)
 const ml_pin_settings adc1_pin = {PORT_GRP_B, 9, PF_B, PP_ODD, ANALOG, DRIVE_OFF};
 
+const ml_pin_settings record_trigger_pin = {PORT_GRP_A, 16, PF_A, PP_EVEN, INPUT_PULL_DOWN, DRIVE_OFF}; 
+
+
 void record_setup(void)
 {
-  DOTSTAR_SET_RED();
+  DOTSTAR_SET_ORANGE();
   //DOTSTAR_SET_LIGHT_GREEN();
 
   ADC0_init();
@@ -152,10 +156,14 @@ void record_setup(void)
   ADC_flush(ADC0);
   ADC_flush(ADC1);
 
+  OSCULP32K_init();
+  eic_init();
+  hardware_int_init();
+  peripheral_port_init(&record_trigger_pin);
+  eic_enable();
+
   _init_record_dma();
 
-  EVSYS->SWEVT.bit.CHANNEL0 = 0x01;
-  EVSYS->SWEVT.bit.CHANNEL1 = 0x01;
 }
 
 _Bool left_finished = false;
@@ -164,6 +172,8 @@ _Bool right_finished = false;
 _Bool ser_write = false;
 _Bool ser_read =  false;
 uint16_t ser_ret_val = 0;
+
+_Bool recording = false;
 
 
 uint16_t record_loop
@@ -180,8 +190,6 @@ uint16_t record_loop
     memcpy((void *)tx_buffer, (const void *)record_buffer, sizeof(record_buffer));
     ML_DMAC_CHANNEL_RESUME(RIGHT_RECORD_CHANNEL);
     ML_DMAC_CHANNEL_RESUME(LEFT_RECORD_CHANNEL);
-
-    DOTSTAR_SET_GREEN();
 
     left_finished = right_finished = false;
 
@@ -204,3 +212,23 @@ void DMAC_1_Handler(void)
   left_finished = true;
   DMAC->Channel[1].CHINTFLAG.reg = DMAC_CHINTFLAG_MASK;
 }
+
+#if defined(BUILD_RECORD)
+void EIC_0_Handler(void)
+{
+    // clr flags
+    EIC->INTFLAG.reg = EIC_INTFLAG_MASK;
+
+    //DOTSTAR_SET_ORANGE();
+
+    if(!recording)
+    {
+      EVSYS->SWEVT.bit.CHANNEL0 = 0x01;
+      EVSYS->SWEVT.bit.CHANNEL1 = 0x01;
+
+      DOTSTAR_SET_GREEN();
+
+      recording = true;
+    }
+}
+#endif // BUILD_RECORD

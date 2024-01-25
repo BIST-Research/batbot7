@@ -11,7 +11,7 @@
 
 #define B_TO_H(b1, b2) (((uint16_t)b1 << 8) | ((uint16_t) b2))
 
-#define SERIAL_BAUD 115200
+#define SERIAL_BAUD 460800
 #define SER_BUF_LEN 256
 #define SER_RAW_BUF_LEN (2*SER_BUF_LEN + 3)
 

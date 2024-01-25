@@ -7,7 +7,9 @@ import numpy as np
 
 from bb_utils import *
 from ser_utils import *
+
 from hw_defs import DAC_MAX_INT
+from hw_defs import DAC_SAMPLING_RATE
 
 TEST_EMIT_UPD_MSG = [TX_MSG_FRAME, 0x01, 0x0b, 0xb8, 0x00, 0x18]
 
@@ -17,7 +19,7 @@ MAX_EMIT_LENGTH = 32768
 EMIT_VALIDATE_LENGTH = 0b00000001
 EMIT_VALIDATE_DAC_BOUNDS = 0b00000010
 EMIT_VALIDATE_STRENGTH = 0b00000100
-
+    
 def validate_emit_upd(mask, data, size):
 
     ret_val = 0
@@ -31,7 +33,6 @@ def validate_emit_upd(mask, data, size):
     dydx = np.diff(data)
     [print(n) for n in dydx]
 
-    
 
 def build_emit_upd(emit_len, npy_data):
 
@@ -45,3 +46,10 @@ def build_emit_upd(emit_len, npy_data):
 
     return chunks, (TX_FLAG, EMITTER_FLAG)
 
+
+def gen_sine(start_time, end_time, frequency):
+    tvec = np.arange(start_time, end_time, 1/DAC_SAMPLING_RATE)
+    
+    s = (DAC_MAX_INT - 1)/2 * (1 + np.sin(2 * np.pi * frequency * tvec))
+    
+    return build_emit_upd(len(s), s.astype(np.uint16))

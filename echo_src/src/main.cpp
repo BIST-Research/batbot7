@@ -7,7 +7,7 @@
 #include <emit.hpp>
 
 //#define BUILD_RECORD
-#define BUILD_EMIT
+//#define BUILD_EMIT
 //#define SERIAL_BLOCK
 
 uint8_t rx_buffer[SER_BUF_LEN];
@@ -48,8 +48,12 @@ void loop(void)
 
     if(ser_action & SER_RET_WRITE)
     {
-        uint8_t tx_frame_type = SER_RET_FRAME(ser_action);
-        write_buffer(tx_buffer, tx_frame_type);
+        if(Serial.availableForWrite())
+        {        
+            uint8_t tx_frame_type = SER_RET_FRAME(ser_action);
+            write_buffer(tx_buffer, tx_frame_type);
+        }
+
     }
 
     if(ser_action & SER_RET_READ)

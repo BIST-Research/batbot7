@@ -136,7 +136,7 @@ void _emit_dmac_init(void)
 
 void emit_setup(void)
 {
-    //DOTSTAR_SET_ORANGE();
+    DOTSTAR_SET_ORANGE();
 
     DAC_init();
     DAC0_init();
@@ -214,7 +214,7 @@ uint16_t emit_loop
             
             // Set chirp interrupt after finished updating
             EIC->INTENSET.reg |= (1 << EIC_INTENSET_EXTINT(0));
-            //DOTSTAR_SET_GREEN();
+            DOTSTAR_SET_BLUE();
         }
     }
 
@@ -237,9 +237,11 @@ uint16_t emit_loop
 void DMAC_2_Handler(void)
 {
     DMAC->Channel[2].CHINTFLAG.bit.TCMPL = 0x01;
+    DOTSTAR_SET_ORANGE();
     chirping = false;
 }
 
+#if defined(BUILD_EMIT)
 void EIC_0_Handler(void)
 {
     // clr flags
@@ -250,6 +252,8 @@ void EIC_0_Handler(void)
     if(!chirping)
     {
         EMIT_SOFT_TRIGGER();
+        DOTSTAR_SET_GREEN();
         chirping = true;
     }
 }
+#endif

@@ -1,4 +1,5 @@
 from datetime import datetime
+import serial
 
 def get_timestamp_now():
     return datetime.now().strftime('%Y%m%d_%H%M%S%f')[:-3]
@@ -25,4 +26,19 @@ def list2bytearr(lst, order):
         for o in reversed(range(0, order)):
             byterr.append(b[o])
     return byterr
+
+def search_comports(serial_numbers):
+
+    for port in serial.tools.list_ports.comports():
+    
+        for serial_number in serial_numbers:
+            
+            if type(port.serial_number) != str:
+                continue
+        
+            if port.serial_number == serial_number:
+                return port
+    
+    return None
+
 
