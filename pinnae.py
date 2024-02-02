@@ -170,6 +170,7 @@ class PinnaeController:
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
         # this has not been implemented yet but will basically send MCU 
         # tells the MCU this is the new zero point
+        self.current_angles[motor_index] = 0
         self.send_MCU_angles(motor_index)
 
     # set motors to max angle
