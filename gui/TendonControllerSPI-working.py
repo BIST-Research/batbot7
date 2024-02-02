@@ -35,7 +35,8 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-
+# for developing on not the PI we create fake library
+# that mimics spidev
 try:
     from spidev import SpiDev
 except ImportError:
@@ -571,6 +572,8 @@ class Widget(QWidget):
         self.setNewMotorZeroPB[5].pressed.connect(
             lambda: self.setNewMotorZeroPB_pressed_callback(5)
         )
+        
+        
 
     def motorAngleSB_editingFinished_callback(self, index):
         """Sets the slider and spin box values to 0"""
@@ -611,6 +614,34 @@ class Widget(QWidget):
 
     def setNewMotorZeroPB_pressed_callback(self, index):
         """User requests that current angle be set as the zero point"""
+        writeData = np.zeros(13,dtype=np.byte)
+    
+        # first index is used for telling motors to 
+        # set their current encoder positions as zero
+        writeData[0] = index
+        
+        writeData[1] = (self.motorAngleSB[0].value() >> 8) & 0xff
+        writeData[2] = (self.motorAngleSB[0].value()) & 0xff
+        
+        writeData[3] = (self.motorAngleSB[1].value() >> 8) & 0xff
+        writeData[4] = (self.motorAngleSB[1].value()) & 0xff
+            
+        writeData[5] = (self.motorAngleSB[2].value() >> 8) & 0xff
+        writeData[6] = (self.motorAngleSB[2].value()) & 0xff
+        
+        writeData[7] = (self.motorAngleSB[3].value() >> 8) & 0xff
+        writeData[8] = (self.motorAngleSB[3].value()) & 0xff
+        
+        writeData[9] = (self.motorAngleSB[4].value() >> 8) & 0xff
+        writeData[10] = (self.motorAngleSB[4].value()) & 0xff
+        
+        writeData[11] = (self.motorAngleSB[5].value() >> 8) & 0xff
+        writeData[12] = (self.motorAngleSB[5].value()) & 0xff
+        writeData = writeData.tolist()
+
+    
+        self.spi.xfer2(writeData)
+        
 
 
     # ---------------------------------------------------------------------------------
