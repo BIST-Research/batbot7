@@ -620,6 +620,7 @@ class Widget(QWidget):
         self.minMotorAngleSB[index].setValue(-180)
         
         # set the current value as zero
+        self.motorAngleSliders[index].setValue(0)
         self.motorAngleSB[index].setValue(0)
         
         writeData = np.zeros(13,dtype=np.byte)
