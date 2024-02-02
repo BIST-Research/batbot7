@@ -42,7 +42,9 @@ class PinnaeController():
 
     def send_MCU_angles(self) -> None:
         """Sends all 6 of the angles to the Grand Central, 
-        in a fashion of 2 bytes for each motor angle
+        in a fashion of 2 bytes for each motor angle. The original 
+        angles are represented as signed 16 int, here we break them into 
+        bytes and send them
 
         """
         data_buffer = np.zeros(NUM_PINNAE_MOTORS*2 + 1,dtype=np.byte)
@@ -75,7 +77,10 @@ class PinnaeController():
         data_buffer[11] = (self.current_angles[5] >> 8) & 0xff
         data_buffer[12] =  self.current_angles[5] & 0xff
         
-        pass
+        # convert the data to list so we can send it
+        write_data = data_buffer.tolist()
+        self.spi.xfer2(write_data)
+        
 
 
     def set_motor_limit(self,motor_index: np.uint8, min: np.int16, max: np.int16)-> bool:

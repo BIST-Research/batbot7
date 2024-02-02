@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QAbstractItemView,
     QMenu,
+    QLineEdit
 )
 from PyQt6.QtCore import Qt, QFile, QTextStream, QThread, pyqtSignal,QObject
 import sys
@@ -403,6 +404,13 @@ class Widget(QWidget):
         self.timeStepSB.setToolTip("frequency motors change position")
         buttonVLay.addWidget(self.timeStepSB)
 
+        # count of number of cycles
+        self.cycleCountSB = QSpinBox()
+        self.cycleCountSB.setDisabled(True)
+        self.cycleCountSB.setSuffix(" cycles")
+        self.cycleCountSB.setRange(0,2147483647)
+        buttonVLay.addWidget(self.cycleCountSB)
+
         # add row button
         self.addRowPB = QPushButton("Add")
         self.addRowPB.pressed.connect(self.addRowPB_pressed_callback)
@@ -683,6 +691,7 @@ class Widget(QWidget):
              # print(dataArray)
              self.instructionThread = RunInstructionsThread(dataArray,self.timeStepSB.value(),self.spi)
              self.instructionThread.start()
+             self.instructionThread.cycle_complete.connect(self.cycle_complete_emit_callback)
              self.instructionThreadRunning = True
              self.startInstPB.setText("Stop")
         else:
@@ -691,6 +700,10 @@ class Widget(QWidget):
              if self.instructionThread is not None and self.instructionThread.isRunning():
                  self.instructionThread.stop()
                 
+    def cycle_complete_emit_callback(self,dataIn):
+        self.cycleCountSB.setValue(dataIn)
+        
+
     def copyCurAnglesPB_pressed_callback(self):
         """Copies the current angles into table row"""
         logging.debug("copyCurAnglesPB called")
@@ -830,6 +843,7 @@ class Widget(QWidget):
     
         self.spi.xfer2(writeData)
 
+
         
 
     def serialThread_emit_callback(self,dataIn):
@@ -881,6 +895,8 @@ class ReadSerialThread(QThread):
         self.terminate()
 
 class RunInstructionsThread(QThread):
+    cycle_complete = pyqtSignal(int)
+
     def __init__(self,dataArray,freq,spiObj):
         QThread.__init__(self)
         self.data = dataArray
@@ -889,6 +905,7 @@ class RunInstructionsThread(QThread):
         self.curIndex = 0
         self.maxIndex = len(dataArray)
         self.spiObj = spiObj
+        self.cycle_count = 0
         
     def run(self):
         logging.debug("RunInstructionsThread starting")
@@ -898,6 +915,8 @@ class RunInstructionsThread(QThread):
             self.curIndex+=1
             if self.curIndex >= self.maxIndex:
                 self.curIndex = 0
+                self.cycle_count += 1
+                self.cycle_complete.emit(self.cycle_count)
             
             time.sleep(self.timeBetween)
             
