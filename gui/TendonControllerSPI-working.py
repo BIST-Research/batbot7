@@ -802,25 +802,29 @@ class Widget(QWidget):
         """writes all spi data to device"""
         logging.debug("writeAllSPIData")
         # ~ writeData = bytearray(12)
-        writeData = np.zeros(12,dtype=np.byte)
+        writeData = np.zeros(13,dtype=np.byte)
     
-        writeData[0] = (self.motorAngleSB[0].value() >> 8) & 0xff
-        writeData[1] = (self.motorAngleSB[0].value()) & 0xff
+        # first index is used for telling motors to 
+        # set their current encoder positions as zero
+        writeData[0] = 0
         
-        writeData[2] = (self.motorAngleSB[1].value() >> 8) & 0xff
-        writeData[3] = (self.motorAngleSB[1].value()) & 0xff
+        writeData[1] = (self.motorAngleSB[0].value() >> 8) & 0xff
+        writeData[2] = (self.motorAngleSB[0].value()) & 0xff
+        
+        writeData[3] = (self.motorAngleSB[1].value() >> 8) & 0xff
+        writeData[4] = (self.motorAngleSB[1].value()) & 0xff
             
-        writeData[4] = (self.motorAngleSB[2].value() >> 8) & 0xff
-        writeData[5] = (self.motorAngleSB[2].value()) & 0xff
+        writeData[5] = (self.motorAngleSB[2].value() >> 8) & 0xff
+        writeData[6] = (self.motorAngleSB[2].value()) & 0xff
         
-        writeData[6] = (self.motorAngleSB[3].value() >> 8) & 0xff
-        writeData[7] = (self.motorAngleSB[3].value()) & 0xff
+        writeData[7] = (self.motorAngleSB[3].value() >> 8) & 0xff
+        writeData[8] = (self.motorAngleSB[3].value()) & 0xff
         
-        writeData[8] = (self.motorAngleSB[4].value() >> 8) & 0xff
-        writeData[9] = (self.motorAngleSB[4].value()) & 0xff
+        writeData[9] = (self.motorAngleSB[4].value() >> 8) & 0xff
+        writeData[10] = (self.motorAngleSB[4].value()) & 0xff
         
-        writeData[10] = (self.motorAngleSB[5].value() >> 8) & 0xff
-        writeData[11] = (self.motorAngleSB[5].value()) & 0xff
+        writeData[11] = (self.motorAngleSB[5].value() >> 8) & 0xff
+        writeData[12] = (self.motorAngleSB[5].value()) & 0xff
         writeData = writeData.tolist()
 
     

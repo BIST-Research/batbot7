@@ -11,7 +11,7 @@ try:
     import spidev
 except ImportError:
     logging.error("spidev not found, running fake_spidev! SPI will not work!")
-    import fake_spidev
+    import fake_spidev as spidev
 
 # global variables holding number of motors in A ear
 NUM_PINNAE_MOTORS = 6
@@ -45,8 +45,36 @@ class PinnaeController():
         in a fashion of 2 bytes for each motor angle
 
         """
-        data_buffer = np.zeros(NUM_PINNAE_MOTORS*2,dtype=np.byte)
+        data_buffer = np.zeros(NUM_PINNAE_MOTORS*2 + 1,dtype=np.byte)
 
+        # first index is for setting telling MCU to use its current encoder 
+        # angle as the zero, we will just set for zero
+        data_buffer[0] = 0
+        
+        # first motor
+        data_buffer[1] = (self.current_angles[0] >> 8) & 0xff
+        data_buffer[2] =  self.current_angles[0] & 0xff
+        
+        # second motor
+        data_buffer[3] = (self.current_angles[1] >> 8) & 0xff
+        data_buffer[4] =  self.current_angles[1] & 0xff
+        
+        # third motor
+        data_buffer[5] = (self.current_angles[2] >> 8) & 0xff
+        data_buffer[6] =  self.current_angles[2] & 0xff
+        
+        # fourth motor
+        data_buffer[7] = (self.current_angles[3] >> 8) & 0xff
+        data_buffer[8] =  self.current_angles[3] & 0xff
+        
+        # fifth motor
+        data_buffer[9] = (self.current_angles[4] >> 8) & 0xff
+        data_buffer[10] = self.current_angles[4] & 0xff
+        
+        # sixth motor
+        data_buffer[11] = (self.current_angles[5] >> 8) & 0xff
+        data_buffer[12] =  self.current_angles[5] & 0xff
+        
         pass
 
 
