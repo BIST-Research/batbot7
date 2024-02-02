@@ -614,6 +614,14 @@ class Widget(QWidget):
 
     def setNewMotorZeroPB_pressed_callback(self, index):
         """User requests that current angle be set as the zero point"""
+        
+        # change the limits 
+        self.maxMotorAngleSB[index].value = 180
+        self.minMotorAngleSB[index].value  = -180
+        
+        # set the current value as zero
+        self.motorAngleSB[index] = 0
+        
         writeData = np.zeros(13,dtype=np.byte)
     
         # first index is used for telling motors to 
