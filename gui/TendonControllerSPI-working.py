@@ -35,13 +35,12 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-useFake = False
+
 try:
-    import spidev
+    from spidev import SpiDev
 except ImportError:
     logging.error("no spidev found, developing on different os ")
-    import fake_spidev
-    useFake = True
+    from fake_spidev import fake_SpiDev as SpiDev
 
 
 
@@ -60,10 +59,7 @@ class Widget(QWidget):
 
     spiBus = 0
     spiDev = 0
-    if useFake:
-        spi = fake_spidev.SpiDev()
-    else:
-        spi = spidev.SpiDev()
+    spi = SpiDev()
     
     def __init__(self):
         QWidget.__init__(self)

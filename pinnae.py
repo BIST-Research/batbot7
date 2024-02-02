@@ -11,7 +11,7 @@ try:
     import spidev
 except ImportError:
     logging.error("spidev not found, running fake_spidev! SPI will not work!")
-    import fake_spidev as spidev
+    import gui.fake_spidev as spidev
 
 # global variables holding number of motors in A ear
 NUM_PINNAE_MOTORS = 6

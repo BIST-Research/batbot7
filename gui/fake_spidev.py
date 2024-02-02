@@ -9,7 +9,7 @@ nothing but log the information to console
     
 import logging
 
-class SpiDev():
+class fake_SpiDev():
     def __init__(self):
         """this is a fake init"""
         self.mode = 0
