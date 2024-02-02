@@ -103,6 +103,40 @@ class PinnaeController:
         self.min_angle_limits[motor_index] = min
 
         return True
+    
+    def set_motor_min_limit(self,motor_index: np.uint8, min: np.int16) -> bool:
+        """sets the motor min limit if it is greater than current angle
+
+        Args:
+            motor_index (np.uint8): motor of choice
+            min (np.int16): new min value to use
+
+        Returns:
+            bool: true if possible
+        """
+        if self.current_angles[motor_index] < min:
+            logging.error("set_motor_min_limit: new limit out of range")
+            return False
+        
+        self.min_angle_limits[motor_index] = min
+        return True
+
+    def set_motor_max_limit(self,motor_index: np.uint8, max: np.int16) -> bool:
+        """sets the motor max limit if it is greater than current angle
+
+        Args:
+            motor_index (np.uint8): motor of choice
+            max (np.int16): new max value to use
+
+        Returns:
+            bool: true if possible
+        """
+        if self.current_angles[motor_index] > max:
+            logging.error("set_motor_max_limit: new limit out of range")
+            return False
+        
+        self.max_angle_limits[motor_index] = max
+        return True
         
     
 
@@ -240,6 +274,12 @@ class PinnaeController:
     
 
 def print_custom_functions(class_instance):
+    """Prints the custom functions 
+    in the class
+
+    Args:
+        class_instance (_type_): _description_
+    """
     # Get the class of the instance
     class_type = type(class_instance)
 
