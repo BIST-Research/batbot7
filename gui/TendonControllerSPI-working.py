@@ -616,8 +616,8 @@ class Widget(QWidget):
         """User requests that current angle be set as the zero point"""
         
         # change the limits 
-        self.maxMotorAngleSB[index].value = 180
-        self.minMotorAngleSB[index].value  = -180
+        self.maxMotorAngleSB[index].setValue(180) 
+        self.minMotorAngleSB[index].setValue(-180)
         
         # set the current value as zero
         self.motorAngleSB[index] = 0
