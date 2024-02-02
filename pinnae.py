@@ -6,12 +6,13 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 import argparse
 
-# only on linux
+# for developing on not the PI we create fake library
+# that mimics spidev
 try:
-    import spidev
+    from spidev import SpiDev
 except ImportError:
-    logging.error("spidev not found, running fake_spidev! SPI will not work!")
-    import gui.fake_spidev as spidev
+    logging.error("no spidev found, developing on different os ")
+    from gui.fake_spidev import fake_SpiDev as SpiDev
 
 # global variables holding number of motors in A ear
 NUM_PINNAE_MOTORS = 6
@@ -20,8 +21,8 @@ NUM_PINNAE_MOTORS = 6
 DEFAULT_MIN_ANGLE_LIMIT = -180
 DEFAULT_MAX_ANGLE_LIMIT = 180
 
-class PinnaeController():
-    def __init__(self,spi_bus,spi_select) -> None:
+class PinnaeController:
+    def __init__(self,spi_bus=0,spi_select=0) -> None:
         # holds the current angles of the motors
         self.current_angles = np.zeros(NUM_PINNAE_MOTORS,dtype=np.int16)
 
@@ -34,13 +35,13 @@ class PinnaeController():
         self.max_angle_limits[:] = DEFAULT_MAX_ANGLE_LIMIT
         
         ## for spidev library
-        self.spi = spidev.SpiDev()
+        self.spi = SpiDev()
         self.spi.open(spi_bus,spi_select)
         self.spi.mode = 0
         # self.spi.max_speed_hz = 500000
         
 
-    def send_MCU_angles(self) -> None:
+    def send_MCU_angles(self,zero_index) -> None:
         """Sends all 6 of the angles to the Grand Central, 
         in a fashion of 2 bytes for each motor angle. The original 
         angles are represented as signed 16 int, here we break them into 
@@ -51,7 +52,7 @@ class PinnaeController():
 
         # first index is for setting telling MCU to use its current encoder 
         # angle as the zero, we will just set for zero
-        data_buffer[0] = 0
+        data_buffer[0] = zero_index+1
         
         # first motor
         data_buffer[1] = (self.current_angles[0] >> 8) & 0xff
@@ -237,8 +238,11 @@ class PinnaeController():
     
     
     
-    if __name__ == "__main__":
-        parser = argparse.ArgumentParser(description="Control a single pinnae")
-        
-        
-        pass
+if __name__ == "__main__":
+
+    # create the pinnae controller 
+    pinnae = PinnaeController()
+    
+    
+    print("Sample Pinnae controller")
+    print("To command angle use syntax: []")
