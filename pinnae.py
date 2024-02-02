@@ -170,7 +170,7 @@ class PinnaeController:
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
         # this has not been implemented yet but will basically send MCU 
         # tells the MCU this is the new zero point
-        pass
+        self.send_MCU_angles(motor_index)
 
     # set motors to max angle
     def set_motor_to_max(self,motor_index:np.uint8)->None:
@@ -237,12 +237,28 @@ class PinnaeController:
         pass
     
     
-    
+
+def print_custom_functions(class_instance):
+    # Get the class of the instance
+    class_type = type(class_instance)
+
+    # Get a list of attributes of the class
+    class_attributes = dir(class_type)
+
+    # Filter out only the custom methods
+    custom_methods = [method for method in class_attributes
+                      if callable(getattr(class_type, method)) and not method.startswith("__")]
+
+    # Print the names of the custom methods
+    print(f"Custom methods of the class {class_type.__name__}:")
+    for custom_method in custom_methods:
+        print(custom_method)
+        
 if __name__ == "__main__":
 
     # create the pinnae controller 
     pinnae = PinnaeController()
     
     
-    print("Sample Pinnae controller")
-    print("To command angle use syntax: []")
+    print("Pinnae Controller REPL\n")
+    print_custom_functions(pinnae)
