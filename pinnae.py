@@ -4,8 +4,14 @@ import numpy as np
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
+import argparse
 
-import spidev
+# only on linux
+try:
+    import spidev
+except ImportError:
+    logging.error("spidev not found, running fake_spidev! SPI will not work!")
+    import fake_spidev
 
 # global variables holding number of motors in A ear
 NUM_PINNAE_MOTORS = 6
@@ -15,7 +21,7 @@ DEFAULT_MIN_ANGLE_LIMIT = -180
 DEFAULT_MAX_ANGLE_LIMIT = 180
 
 class PinnaeController():
-    def __init__(self) -> None:
+    def __init__(self,spi_bus,spi_select) -> None:
         # holds the current angles of the motors
         self.current_angles = np.zeros(NUM_PINNAE_MOTORS,dtype=np.int16)
 
@@ -26,6 +32,12 @@ class PinnaeController():
         # max angle for each motor
         self.max_angle_limits = np.zeros(NUM_PINNAE_MOTORS,dtype=np.int16)
         self.max_angle_limits[:] = DEFAULT_MAX_ANGLE_LIMIT
+        
+        ## for spidev library
+        self.spi = spidev.SpiDev()
+        self.spi.open(spi_bus,spi_select)
+        self.spi.mode = 0
+        # self.spi.max_speed_hz = 500000
         
 
     def send_MCU_angles(self) -> None:
@@ -123,6 +135,7 @@ class PinnaeController():
         """
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
         # this has not been implemented yet but will basically send MCU 
+        # tells the MCU this is the new zero point
         pass
 
     # set motors to max angle
@@ -133,6 +146,8 @@ class PinnaeController():
 
 
     def set_motors_to_max(self)->None:
+        """Set all motors to their max angle
+        """
         self.current_angles[:] = self.max_angle_limits[:]
         self.send_MCU_angles()
 
@@ -185,4 +200,12 @@ class PinnaeController():
             frequency (np.uint8): _description_
             times (int, optional): _description_. Defaults to 1.
         """
+        pass
+    
+    
+    
+    if __name__ == "__main__":
+        parser = argparse.ArgumentParser(description="Control a single pinnae")
+        
+        
         pass
