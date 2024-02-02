@@ -41,7 +41,7 @@ class PinnaeController:
         # self.spi.max_speed_hz = 500000
         
 
-    def send_MCU_angles(self,zero_index) -> None:
+    def send_MCU_angles(self,zero_index = -1) -> None:
         """Sends all 6 of the angles to the Grand Central, 
         in a fashion of 2 bytes for each motor angle. The original 
         angles are represented as signed 16 int, here we break them into 
