@@ -627,7 +627,7 @@ class Widget(QWidget):
     
         # first index is used for telling motors to 
         # set their current encoder positions as zero
-        writeData[0] = index
+        writeData[0] = index +1
         
         writeData[1] = (self.motorAngleSB[0].value() >> 8) & 0xff
         writeData[2] = (self.motorAngleSB[0].value()) & 0xff
@@ -641,7 +641,7 @@ class Widget(QWidget):
         writeData[7] = (self.motorAngleSB[3].value() >> 8) & 0xff
         writeData[8] = (self.motorAngleSB[3].value()) & 0xff
         
-        writeData[9] = (self.motorAngleSB[4].value() >> 8) & 0xff
+        writeData[9] =  (self.motorAngleSB[4].value() >> 8) & 0xff
         writeData[10] = (self.motorAngleSB[4].value()) & 0xff
         
         writeData[11] = (self.motorAngleSB[5].value() >> 8) & 0xff
