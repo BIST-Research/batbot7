@@ -81,6 +81,7 @@ class PinnaeController:
         # convert the data to list so we can send it
         write_data = data_buffer.tolist()
         self.spi.xfer2(write_data)
+        return write_data
         
 
 
@@ -181,7 +182,9 @@ class PinnaeController:
 
 
     def set_motor_angles(self,angles:np.int16)->bool:
-        assert len(angles) == NUM_PINNAE_MOTORS, f"Expected array to be {NUM_PINNAE_MOTORS}, but got {len(angles)}"
+        if not isinstance(angles,list) or len(angles) != NUM_PINNAE_MOTORS:
+            return False
+        
         
         # check if values in range
         if any(angles > self.max_angle_limits) or any(angles < self.min_angle_limits):
