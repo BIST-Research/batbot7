@@ -7,6 +7,7 @@ Purpose: tests the PinnaeController class
 import unittest
 
 import sys,os
+import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -169,7 +170,11 @@ class TestClass(unittest.TestCase):
             self.assertEqual(pinnae.current_angles[i],pinnae.max_angle_limits[i])
     
     def test_set_motors_to_max(self):
-        pass
+        pinnae = PinnaeController()
+        
+        self.assertFalse(np.array_equal(pinnae.current_angles,pinnae.max_angle_limits))
+        pinnae.set_motors_to_max()
+        self.assertTrue(np.array_equal(pinnae.current_angles,pinnae.max_angle_limits))
     
     def test_set_motor_to_min(self):
         pinnae = PinnaeController()
@@ -184,9 +189,57 @@ class TestClass(unittest.TestCase):
             self.assertEqual(pinnae.current_angles[i],pinnae.min_angle_limits[i])
     
     def test_set_motors_to_min(self):
-        pass
-
+        pinnae = PinnaeController()
         
+        self.assertFalse(np.array_equal(pinnae.current_angles,pinnae.min_angle_limits))
+        pinnae.set_motors_to_min()
+        self.assertTrue(np.array_equal(pinnae.current_angles,pinnae.min_angle_limits))
+        
+        
+    def test_set_motor_to_zero(self):
+        pinnae = PinnaeController()
+        
+        for i in range(NUM_MOTORS):
+            pinnae.set_motor_angle(i,10)
+            self.assertTrue(pinnae.current_angles[i] == 10)
+            pinnae.set_motor_to_zero(i)
+            self.assertEqual(pinnae.current_angles[i],0)
+
+            
+    
+    def test_set_motors_to_zero(self):
+        pinnae = PinnaeController()
+        
+        pinnae.set_motors_to_max()
+        self.assertTrue(np.array_equal(pinnae.current_angles,pinnae.max_angle_limits))
+        pinnae.set_motors_to_zero()
+        self.assertFalse(np.array_equal(pinnae.current_angles,pinnae.max_angle_limits))
+        
+        for i in range(NUM_MOTORS):
+            self.assertEqual(pinnae.current_angles[i],0)
+            
+        # set min to above zero this should not work
+        # angle set to 10
+        for i in range(NUM_MOTORS):
+            self.assertTrue(pinnae.set_motor_angle(i,10))
+            self.assertTrue(pinnae.set_motor_min_limit(i,10))
+            
+        self.assertFalse(pinnae.set_motors_to_zero())
+        self.assertTrue(pinnae.set_motor_min_limit(0,-100))
+        self.assertFalse(pinnae.set_motors_to_zero())
+        
+    def test_set_motor_to_zero(self):
+        pinnae = PinnaeController()
+        
+        for i in range(NUM_MOTORS):
+            self.assertTrue(pinnae.set_motor_angle(i,10))
+            self.assertTrue(pinnae.set_motor_min_limit(i,10))
+            self.assertFalse(pinnae.set_motor_to_zero(i))
+            
+            self.assertTrue(pinnae.set_motor_min_limit(i,-10))
+            self.assertTrue(pinnae.set_motor_angle(i,-10))
+            self.assertTrue(pinnae.set_motor_to_zero(i))
+
             
             
             

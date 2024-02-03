@@ -235,14 +235,25 @@ class PinnaeController:
         self.send_MCU_angles()
 
     # set motors to zero
-    def set_motor_to_zero(self,motor_index:np.uint8)->None:
+    def set_motor_to_zero(self,motor_index:np.uint8)->bool:
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
+        
+        if self.min_angle_limits[motor_index] > 0:
+            return False
+    
         self.current_angles[motor_index] = 0
         self.send_MCU_angles()
+        
+        return True
 
-    def set_motors_to_zero(self)->None:
+    def set_motors_to_zero(self)->bool:
+        if any(self.min_angle_limits > 0):
+            return False
+        
         self.current_angles[:] = 0
         self.send_MCU_angles()
+        
+        return True
     # --------------------------------------------------------------------------------------
     #           Functions for moving the motors
 
