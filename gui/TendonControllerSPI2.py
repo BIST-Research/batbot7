@@ -31,21 +31,14 @@ import serial.tools.list_ports
 import time
 import numpy as np
 
+
+
 # logging stuff
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) )
-# for developing on not the PI we create fake library
-# that mimics spidev
-try:
-    from spidev import SpiDev
-except ImportError:
-    logging.error("no spidev found, developing on different os ")
-    from fake_spidev import fake_SpiDev as SpiDev
-
-
-
+from pinnae import PinnaeController
 
 class Widget(QWidget):
     
@@ -58,10 +51,7 @@ class Widget(QWidget):
     allMotorsBox = None
     instructionsBox = None
     
-
-    spiBus = 0
-    spiDev = 0
-    spi = SpiDev()
+    pinnae = PinnaeController()
     
     def __init__(self):
         QWidget.__init__(self)
@@ -108,14 +98,6 @@ class Widget(QWidget):
         # push box to main layout
         self.mainVerticalLayout.addWidget(serialGB)
         
-
-        self.spi.open(self.spiBus,self.spiDev)
-        self.spi.mode = 0
-        self.spi.max_speed_hz = 500000
-
-        # connect callbacks
-        # ~ self.serialObj = None
-        # ~ self.isSerialObjConnected = False
 
 
     def add_indiviual_motor_control_box(self):
@@ -585,7 +567,7 @@ class Widget(QWidget):
             )
             logging.debug("slider value chagned")
             # self.motorAngleSliders[index].setSliderPosition(int(self.motorAngleSB[index].value()))
-            self.writeAllSPIData()
+            # self.writeAllSPIData()
 
     def motorAngleSliders_valueChanged_callback(self, index):
         """When value is changed this gets called"""
@@ -595,7 +577,7 @@ class Widget(QWidget):
                 int(self.motorAngleSliders[index].value())
             )
             logging.debug("SB value chagned")
-            self.writeAllSPIData()
+            # self.writeAllSPIData()
 
     def minMotorAngleSB_editingFinished_callback(self, index):
         """When min limits are changed"""
@@ -661,14 +643,14 @@ class Widget(QWidget):
         if self.allMotorAngleSB.value() != self.allMotorAngleSlider.value():
             self.allMotorAngleSlider.setValue(self.allMotorAngleSB.value())
             logging.debug("allMotorAngleSB called")
-            self.writeAllSPIData()
+            # self.writeAllSPIData()
 
     def allMotorAngleSlider_valueChanged_callback(self):
         """when slider value is changed"""
         if self.allMotorAngleSB.value() != self.allMotorAngleSlider.value():
             self.allMotorAngleSB.setValue(self.allMotorAngleSlider.value())
             logging.debug("allMotorAngleSlider called")
-            self.writeAllSPIData()
+            # self.writeAllSPIData()
 
     def allMinMotorAngleSB_editingFinished_callback(self):
         """when all min value changes"""
@@ -881,7 +863,7 @@ class Widget(QWidget):
         self.spi.xfer2(writeData)
 
 
-        
+      
 
     def serialThread_emit_callback(self,dataIn):
         self.serialOutputTE.append(dataIn)

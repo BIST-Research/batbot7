@@ -10,7 +10,7 @@ import sys,os
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+# sys.path.insert("../")
 from pinnae import PinnaeController
 
 NUM_MOTORS = 6

@@ -12,7 +12,7 @@ try:
     from spidev import SpiDev
 except ImportError:
     logging.error("no spidev found, developing on different os ")
-    from gui.fake_spidev import fake_SpiDev as SpiDev
+    from fake_spidev import fake_SpiDev as SpiDev
 
 # global variables holding number of motors in A ear
 NUM_PINNAE_MOTORS = 6
@@ -284,36 +284,3 @@ class PinnaeController:
             times (int, optional): _description_. Defaults to 1.
         """
         pass
-    
-    
-
-def print_custom_functions(class_instance):
-    """Prints the custom functions 
-    in the class
-
-    Args:
-        class_instance (_type_): _description_
-    """
-    # Get the class of the instance
-    class_type = type(class_instance)
-
-    # Get a list of attributes of the class
-    class_attributes = dir(class_type)
-
-    # Filter out only the custom methods
-    custom_methods = [method for method in class_attributes
-                      if callable(getattr(class_type, method)) and not method.startswith("__")]
-
-    # Print the names of the custom methods
-    print(f"Custom methods of the class {class_type.__name__}:")
-    for custom_method in custom_methods:
-        print(custom_method)
-        
-if __name__ == "__main__":
-
-    # create the pinnae controller 
-    pinnae = PinnaeController()
-    
-    
-    print("Pinnae Controller REPL\n")
-    print_custom_functions(pinnae)
