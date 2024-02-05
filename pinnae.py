@@ -120,6 +120,7 @@ class PinnaeController:
             return False
         
         self.min_angle_limits[motor_index] = min
+        logging.debug(f"Success changing min on {motor_index} to {min}")
         return True
 
     def set_motor_max_limit(self,motor_index: np.uint8, max: np.int16) -> bool:
@@ -137,6 +138,7 @@ class PinnaeController:
             return False
         
         self.max_angle_limits[motor_index] = max
+        logging.debug(f"Success changing max on {motor_index} to {max}")
         return True
         
     
@@ -151,7 +153,28 @@ class PinnaeController:
             np.int16: [min_angle,max_angle]
         """
         return(self.min_angle_limits[motor_index],self.max_angle_limits[motor_index])
+    
+    def get_motor_max_limit(self,motor_index:np.uint8)->np.int16:
+        """Returns the max limit of specific motor
 
+        Args:
+            motor_index (np.uint8): motor to get max index for 
+
+        Returns:
+            np.int16: current max value
+        """
+        return(self.max_angle_limits[motor_index])
+
+    def get_motor_min_limit(self,motor_index:np.uint8)->np.int16:
+        """Returns the min limit of specific motor
+
+        Args:
+            motor_index (np.uint8): motor to get min value for 
+
+        Returns:
+            np.int16: current min value
+        """
+        return(self.min_angle_limits[motor_index])
 
 
 
@@ -176,7 +199,7 @@ class PinnaeController:
         
         # set the angle
         self.current_angles[motor_index] = angle
-
+        logging.debug(f"Success setting motor {motor_index} to {angle}")
         self.send_MCU_angles()
         return True
 
@@ -209,12 +232,15 @@ class PinnaeController:
         # tells the MCU this is the new zero point
         self.current_angles[motor_index] = 0
         self.send_MCU_angles(motor_index)
+        
+        logging.debug(f"Setting motor: {motor_index} new zero position")
 
     # set motors to max angle
     def set_motor_to_max(self,motor_index:np.uint8)->None:
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
         self.current_angles[motor_index] = self.max_angle_limits[motor_index]
         self.send_MCU_angles()
+        logging.debug(f"Setting motor: {motor_index} to max value")
 
 
     def set_motors_to_max(self)->None:
@@ -222,37 +248,45 @@ class PinnaeController:
         """
         self.current_angles[:] = self.max_angle_limits[:]
         self.send_MCU_angles()
+        logging.debug("Setting motors to max")
 
     # set motors to min angle
     def set_motor_to_min(self,motor_index:np.uint8)->None:
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
         self.current_angles[motor_index] = self.min_angle_limits[motor_index]
         self.send_MCU_angles()
+        logging.debug(f"Setting motor: {motor_index} to min")
 
 
     def set_motors_to_min(self)->None:
         self.current_angles[:] = self.min_angle_limits[:]
         self.send_MCU_angles()
+        logging.debug("Setting motors to min")
+
 
     # set motors to zero
     def set_motor_to_zero(self,motor_index:np.uint8)->bool:
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
         
         if self.min_angle_limits[motor_index] > 0:
+            logging.debug(f"Failed to set motor: {motor_index} to zero")
             return False
     
         self.current_angles[motor_index] = 0
         self.send_MCU_angles()
+        logging.debug(f"Success setting motor: {motor_index} to zero")
         
         return True
 
+
     def set_motors_to_zero(self)->bool:
         if any(self.min_angle_limits > 0):
+            logging.debug("Failed to set motors to zero")
             return False
         
         self.current_angles[:] = 0
         self.send_MCU_angles()
-        
+        logging.debug("Setting all motors to zero")
         return True
     # --------------------------------------------------------------------------------------
     #           Functions for moving the motors

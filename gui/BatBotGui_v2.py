@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QDoubleSpinBox,
     QSizePolicy,
+    QErrorMessage
 
 )
 from PyQt6.QtCore import Qt, QFile, QTextStream, QThread, pyqtSignal,QObject
@@ -69,6 +70,7 @@ class Widget(QWidget):
     mainVLay = QVBoxLayout()
     
     
+    pinnae = PinnaeController()
     
     def __init__(self):
         """Adds all the widgets to GUI"""
@@ -271,36 +273,6 @@ class Widget(QWidget):
 #----------------------------------------------------------------------
     def Add_Pinnae_Control_GB(self):
         """Adds the controls box layout"""
-        # self.pinnaeControlBox = QGroupBox("Pinnae Control")
-        # controlsHLay = QHBoxLayout()
-        
-        # # create tabs for each ear mode
-        # self.singleEarTab = QWidget()
-        # self.dualEarTab = QWidget()
-        
-        # # create tabs 
-        # self.tabs = QTabWidget()
-        # self.tabs.addTab(self.singleEarTab,"Single")
-        # self.tabs.addTab(self.dualEarTab,"Dual")
-        
-        # # init left controls
-        # self.init_leftControls()
-        # # init right controls
-        # self.init_rightControls()
-        
-        # # init box for both ears
-        # self.init_bothControls()
-
-        # # init sonar controls
-        
-        # # init the tabs
-        # self.init_singleEarTab()
-        # self.init_dualEarTab()
-        
-        
-        # controlsHLay.addWidget(self.tabs)
-        # self.pinnaeControlBox.setLayout(controlsHLay)
-        # self.mainVLay.addWidget(self.pinnaeControlBox)
 
         self.pinnae_controls_GB = QGroupBox("Controls")
         
@@ -412,6 +384,7 @@ class Widget(QWidget):
             
             # add min spinbox
             self.motor_min_limit_SB[index].setRange(-max_value,max_value)
+            self.motor_min_limit_SB[index].setValue(-180)
             grid_lay.addWidget(self.motor_min_limit_SB[index],2,1)
             
             ## add the layout
@@ -428,10 +401,12 @@ class Widget(QWidget):
         vertical_layout = QVBoxLayout()
         vertical_layout.addLayout(control_h_lay)
         
+        # attach callbacks for controller tendon api
+        self.add_motor_control_CB()
+        
         hLay = QHBoxLayout()
         # add the instruction table
         self.instruction_TABLE = QTableWidget(1,number_motors)
-        # vertical_layout.addWidget(self.instruction_TABLE)
         hLay.addWidget(self.instruction_TABLE)
         
         
@@ -460,326 +435,142 @@ class Widget(QWidget):
         self.pinnae_controls_GB.setLayout(vertical_layout)
         self.mainVLay.addWidget(self.pinnae_controls_GB)
         
-    def init_leftControls(self):
-        """Creates box of left controls"""
-        self.leftControlBox = QGroupBox("Left Pinnae")
-
-        minAngleSBHlay = QHBoxLayout()
-        self.leftMinAngleSB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-        ]
-        maxAngleSBHlay = QHBoxLayout()
-        self.leftMaxAngleSB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-        ]
+    def add_motor_control_CB(self):
+        """Connects the motor tendons sliders to the api"""
         
-        angleSliderBHlay = QHBoxLayout()
-        self.leftAngleSlider = [
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-        ]
-        
-        for SB in self.leftMinAngleSB:
-            SB.setRange(-1000,1000)
-            SB.setFixedWidth(48)
-            SB.setValue(-180)
-            minAngleSBHlay.addWidget(SB)
-
-        for SB in self.leftMaxAngleSB:
-            SB.setFixedWidth(48)
-            SB.setRange(-1000,1000)
-            SB.setValue(180)
-            maxAngleSBHlay.addWidget(SB)
-            
-        for slider in self.leftAngleSlider:
-            angleSliderBHlay.addWidget(slider)
-            
-        vLay = QVBoxLayout()
-        vLay.addLayout(minAngleSBHlay)
-        vLay.addLayout(angleSliderBHlay)
-        vLay.addLayout(maxAngleSBHlay)
-        
-        self.leftControlBox.setLayout(vLay)
-
-    def init_rightControls(self):
-        """Creates box of left controls"""
-        self.rightControlBox = QGroupBox("Right Pinnae")
-
-        minAngleSBHlay = QHBoxLayout()
-        self.rightMinAngleSB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-        ]
-        maxAngleSBHlay = QHBoxLayout()
-        self.rightMaxAngleSB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-        ]
-
-        angleSBHlay = QHBoxLayout()
-        self.rightAngleSB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-        ]
-        
-        angleSliderBHlay = QHBoxLayout()
-        self.rightAngleSlider = [
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-        ]
-        
-        for SB in self.rightMinAngleSB:
-            SB.setRange(-10000,10000)
-            SB.setFixedWidth(48)
-            SB.setValue(-180)
-            minAngleSBHlay.addWidget(SB)
-
-        for SB in self.rightMaxAngleSB:
-            SB.setFixedWidth(48)
-            SB.setRange(-10000,10000)
-            SB.setValue(180)
-            maxAngleSBHlay.addWidget(SB)
-
-        for SB in self.rightAngleSB:
-            SB.setFixedWidth(48)
-            SB.setRange(-10000,10000)
-            SB.setValue(180)
-            angleSBHlay.addWidget(SB)
-            
-        for slider in self.rightAngleSlider:
-            angleSliderBHlay.addWidget(slider)
-            
-        vLay = QVBoxLayout()
-        vLay.addLayout(minAngleSBHlay)
-        vLay.addLayout(angleSliderBHlay)
-        vLay.addLayout(maxAngleSBHlay)
-
-        
-        self.rightControlBox.setLayout(vLay)
-   
-    def init_bothControls(self):
-        """Creates box of left controls"""
-        self.bothControlBox = QGroupBox("Both")
-        self.bothControlBox.setFixedHeight(230)
-
-        minAngleSBHlay = QHBoxLayout()
-        self.bothMinAngleSB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-        ]
-        maxAngleSBHlay = QHBoxLayout()
-        self.bothMaxAngleSB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-        ]
-        
-        self.bothAngleSB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-        ]
-        
-        angleSliderBHlay = QHBoxLayout()
-        self.bothAngleSlider = [
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-        ]
-        
-        for SB in self.bothMinAngleSB:
-            SB.setRange(-1000,1000)
-            SB.setFixedWidth(48)
-            SB.setValue(-180)
-            minAngleSBHlay.addWidget(SB)
-
-        for SB in self.bothMaxAngleSB:
-            SB.setFixedWidth(48)
-            SB.setRange(-1000,1000)
-            SB.setValue(180)
-            maxAngleSBHlay.addWidget(SB)
-            
-        for slider in self.bothAngleSlider:
-            angleSliderBHlay.addWidget(slider)
-            
-        vLay = QVBoxLayout()
-        vLay.addLayout(minAngleSBHlay)
-        vLay.addLayout(angleSliderBHlay)
-        vLay.addLayout(maxAngleSBHlay)
-
-        
-        self.bothControlBox.setLayout(vLay)
-        # gridLay  = [
-        #     QGridLayout(),
-        #     QGridLayout(),
-        #     QGridLayout(),
-        #     QGridLayout(),
-        #     QGridLayout(),
-        #     QGridLayout(),
-        # ]
-
-        # hLay = QHBoxLayout()
-
-        # for i, lay in enumerate(gridLay):
-        #     lay.addWidget(self.bothMinAngleSB[i],0,0)
-        #     lay.addWidget(self.bothMaxAngleSB[i],0,1)
-        #     lay.addWidget(self.bothAngleSlider[i],1,0,1,2)
-        #     hLay.addLayout(lay)
-        
-        # self.bothControlBox.setLayout(hLay)
-        
-    def init_singleEarTab(self):
-        """inits the single ear tab"""
-        vLay = QVBoxLayout()
-        vLay.addWidget(self.bothControlBox)
-
-        
-        tableHLay = QHBoxLayout()
-        tableBox = QGroupBox("Instructions")
-        self.singleEarInstructionTable = QTableWidget()
-        self.init_singleEarInstructionTable()
-
-        tableHLay.addWidget(self.singleEarInstructionTable)
-
-        buttonsVLay = QVBoxLayout()
-        # start button
-        self.singleEarStartPB = QPushButton("Start")
-        buttonsVLay.addWidget(self.singleEarStartPB)
-
-        # hz options
-        self.singleEarHzSB = QSpinBox()
-        self.singleEarHzSB.setRange(0,400)
-        self.singleEarHzSB.setValue(1)
-        self.singleEarHzSB.setSuffix('Hz')
-        buttonsVLay.addWidget(self.singleEarHzSB)
-
-        # read from file
-        self.singleEarReadFilePB = QPushButton("Read File")
-        buttonsVLay.addWidget(self.singleEarReadFilePB)
-
-
-        tableHLay.addLayout(buttonsVLay)
-        tableBox.setLayout(tableHLay)
-
-        vLay.addWidget(tableBox)
-
-
-        self.singleEarTab.setLayout(vLay)
-    
-    def init_singleEarInstructionTable(self):
-        self.singleEarInstructionTable.setRowCount(1)
-        self.singleEarInstructionTable.setColumnCount(6)
-
-        # preload with zeros and set width
-        widthValue = 80
+        # attach max buttons
         for i in range(6):
-            intNum = QTableWidgetItem()
-            intNum.setData(0,0)
-            self.singleEarInstructionTable.setItem(0,i,intNum)
-            self.singleEarInstructionTable.setColumnWidth(i,widthValue)
-        self.singleEarInstructionTable.setFixedWidth(widthValue*6+20)
+            self.motor_max_PB[i].pressed.connect(lambda index=i: self.motor_max_PB_pressed(index))
+        
+        # attach max limit spinbox
+        for i in range(6):
+            self.motor_max_limit_SB[i].editingFinished.connect(lambda index=i: self.motor_max_limit_changed_CB(index))
 
-    def init_dualEarTab(self):
-        """inits the dual ear tab"""
-        vLay = QVBoxLayout()
-        hLay = QHBoxLayout()
-        hLay.addWidget(self.leftControlBox)
-        hLay.addWidget(self.rightControlBox)
-        # add left and right control box
-        vLay.addLayout(hLay)
+            
+        # attach min buttons
+        for i in range(6):
+            self.motor_min_PB[i].pressed.connect(lambda index=i: self.motor_min_PB_pressed(index))
 
-        tableHLay = QHBoxLayout()
-        tableBox = QGroupBox("Instructions")
-        self.dualEarInstructionTable = QTableWidget()
-        self.init_dualEarInstructionTable()
+        # attach min limit spinbox
+        for i in range(6):
+            self.motor_min_limit_SB[i].editingFinished.connect(lambda index=i: self.motor_min_limit_changed_CB(index))
+            
+            
+        # attach set to zero buttons
+        for i in range(6):
+            self.motor_set_zero_PB[i].pressed.connect(lambda index=i: self.motor_set_zero_PB_callback(index))
 
-        tableHLay.addWidget(self.dualEarInstructionTable)
+        # attach sliders
+        for i in range(6):
+            self.motor_value_SLIDER[i].valueChanged.connect(lambda value, index=i: self.motor_value_SLIDER_valueChanged(index))
+        
+        # attach spinbox
+        for i in range(6):
+            self.motor_value_SB[i].editingFinished.connect(lambda index=i: self.motor_value_SB_valueChanged(index))
+            
+        # adjust the slider and spinbox range
+        for i in range(6):
+            self.motor_max_limit_changed_CB(i)
+        
+    def motor_max_PB_pressed(self,index):
+        """Sets the current motor to its max value
 
-        buttonsVLay = QVBoxLayout()
-        # start button
-        self.dualEarStartPB = QPushButton("Start")
-        buttonsVLay.addWidget(self.dualEarStartPB)
-
-        # hz options
-        self.dualEarHzSB = QSpinBox()
-        self.dualEarHzSB.setRange(0,400)
-        self.dualEarHzSB.setValue(1)
-        self.dualEarHzSB.setSuffix('Hz')
-        buttonsVLay.addWidget(self.dualEarHzSB)
-
-        # read from file
-        self.dualEarReadFilePB = QPushButton("Read File")
-        buttonsVLay.addWidget(self.dualEarReadFilePB)
-
-
-        tableHLay.addLayout(buttonsVLay)
-        tableBox.setLayout(tableHLay)
-
-        vLay.addWidget(tableBox)
-
-
-
-        self.dualEarTab.setLayout(vLay)
-
-    def init_dualEarInstructionTable(self):
-        self.dualEarInstructionTable.setRowCount(1)
-        self.dualEarInstructionTable.setColumnCount(12)
-
-        # preload with zeros and set width
-        widthValue = 50
-        for i in range(12):
-            intNum = QTableWidgetItem()
-            intNum.setData(0,0)
-            self.dualEarInstructionTable.setItem(0,i,intNum)
-            self.dualEarInstructionTable.setColumnWidth(i,widthValue)
-
-        self.dualEarInstructionTable.setFixedWidth(widthValue*12+20)
-        self.dualEarInstructionTable.setHorizontalHeaderLabels(["L1", "L2","L3","L4","L5","L6","R1","R2","R3","R4","R5","R6",])
+        Args:
+            index (_type_): index of motor 
+        """
+        self.pinnae.set_motor_to_max(index)
+        self.motor_value_SB[index].setValue(self.motor_max_limit_SB[index].value())
+        self.motor_value_SLIDER[index].setValue(self.motor_max_limit_SB[index].value())
         
         
+    def motor_min_PB_pressed(self,index):
+        """Sets the current motor to its min value
+
+        Args:
+            index (_type_): index of motor
+        """
+        self.pinnae.set_motor_to_min(index)
+        self.motor_value_SB[index].setValue(self.motor_min_limit_SB[index].value())
+        self.motor_value_SLIDER[index].setValue(self.motor_min_limit_SB[index].value())
+        
+        
+    def motor_value_SB_valueChanged(self,index):
+        """Sets the new spin
+
+        Args:
+            index (_type_): index to change
+        """
+        if self.motor_value_SB[index].value() != self.motor_value_SLIDER[index].value():
+            self.motor_value_SLIDER[index].setValue(self.motor_value_SB[index].value())
+            self.pinnae.set_motor_angle(index, self.motor_value_SB[index].value())
+        
+        
+    def motor_value_SLIDER_valueChanged(self,index):
+        """Sets the slider value
+
+        Args:
+            index (_type_): index to change
+        """
+        # print(f"value {index}")
+        if self.motor_value_SLIDER[index].value() != self.motor_value_SB[index].value():
+            self.motor_value_SB[index].setValue(self.motor_value_SLIDER[index].value())
+            self.pinnae.set_motor_angle(index,self.motor_value_SLIDER[index].value())
+    
+    
+    def motor_set_zero_PB_callback(self,index):
+        """Callback for when the set new zero push button is set
+
+        Args:
+            index (_type_): changing motor new zero position
+        """
+        self.pinnae.set_new_zero_position(index)
+        [min,max] = self.pinnae.get_motor_limit(index)
+        
+        # adjust the new limits of spinbox
+        self.motor_max_limit_SB[index].setValue(max)
+        self.motor_min_limit_SB[index].setValue(min)
+        
+        # set new values to 0
+        self.motor_value_SB[index].setValue(0)
+        self.motor_value_SLIDER[index].setValue(0)
+        
+        
+    def motor_max_limit_changed_CB(self,index):
+        """callback when limit spinbox is changed
+
+        Args:
+            index (_type_): index of motors
+        """
+        
+        new_value = self.motor_max_limit_SB[index].value()
+        
+        if  self.pinnae.set_motor_max_limit(index,new_value):
+            [min,max] = self.pinnae.get_motor_limit(index)
+            self.motor_value_SLIDER[index].setRange(min,max)
+            self.motor_value_SB[index].setRange(min,max)
+        else:
+            self.motor_max_limit_SB[index].setValue(self.pinnae.get_motor_max_limit(index))
+            error_msg = QErrorMessage(self)
+            error_msg.showMessage("New max is greater than current angle!")
+
+    def motor_min_limit_changed_CB(self,index):
+        """callback when limit spinbox is changed
+
+        Args:
+            index (_type_): index of motors
+        """
+        
+        new_value = self.motor_min_limit_SB[index].value()
+        
+        if self.pinnae.set_motor_min_limit(index,new_value):
+            [min,max] = self.pinnae.get_motor_limit(index)
+            self.motor_value_SLIDER[index].setRange(min,max)
+            self.motor_value_SB[index].setRange(min,max)
+        else:
+            self.motor_min_limit_SB[index].setValue(self.pinnae.get_motor_min_limit(index))
+            error_msg = QErrorMessage(self)
+            error_msg.showMessage("New min is less than current angle!")
+    
 #----------------------------------------------------------------------
     def init_echoControl_box(self):
         """Adds the sonar box layout"""
