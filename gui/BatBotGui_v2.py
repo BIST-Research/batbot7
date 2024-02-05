@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
 
 )
 from PyQt6.QtCore import Qt, QFile, QTextStream, QThread, pyqtSignal,QObject
-import sys
+import sys,os
 import serial
 import serial.tools.list_ports
 import time
@@ -56,6 +56,8 @@ class MplCanvas(FigureCanvasQTAgg):
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) )
+from pinnae import PinnaeController
 
 # frequency of dac and adc
 DAC_ADC_FREQ = 1e6
@@ -160,15 +162,15 @@ class Widget(QWidget):
         self.chirp_buffer_length_SB = QLineEdit()
         self.chirp_buffer_length_SB.setReadOnly(True)
         self.chirp_buffer_length_SB.setMaximumWidth(buffer_col_len)
-        chirp_grid.addWidget(QLabel("Chirp:"),0,4)
-        chirp_grid.addWidget(self.chirp_buffer_length_SB,0,5)
+        # chirp_grid.addWidget(QLabel("Chirp:"),0,4)
+        # chirp_grid.addWidget(self.chirp_buffer_length_SB,0,5)
         
         # lengthf of listen buffers
         self.listen_buffer_length_SB = QLineEdit()
         self.listen_buffer_length_SB.setReadOnly(True)
         self.listen_buffer_length_SB.setMaximumWidth(buffer_col_len)
-        chirp_grid.addWidget(QLabel("Listen:"),1,4)
-        chirp_grid.addWidget(self.listen_buffer_length_SB,1,5)
+        # chirp_grid.addWidget(QLabel("Listen:"),1,4)
+        # chirp_grid.addWidget(self.listen_buffer_length_SB,1,5)
         
         # preview chirp
         self.preview_chirp_PB = QPushButton("Preview")
