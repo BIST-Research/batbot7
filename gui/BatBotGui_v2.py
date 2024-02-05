@@ -418,13 +418,23 @@ class Widget(QWidget):
         self.realistic_ears_CB.setToolTip("Each ear will be out of phase if checked like a real bat")
         table_side_v_lay.addWidget(self.realistic_ears_CB)
         
-        # create 
+        # create start button
         table_side_grid = QGridLayout()
         self.start_stop_instruction_PB = QPushButton("Start")
         table_side_grid.addWidget(self.start_stop_instruction_PB,0,0)
+        
+        # acuation rate
         self.intstruction_speed_SB = QSpinBox()
+        self.intstruction_speed_SB.setValue(1)
+        self.intstruction_speed_SB.setRange(1,50)
         self.intstruction_speed_SB.setSuffix(" Hz")
         table_side_grid.addWidget(self.intstruction_speed_SB,0,1)
+        
+        # cycle counter
+        table_side_grid.addWidget(QLabel("Count:"),1,0)
+        self.cycle_counter_SB = QSpinBox()
+        self.cycle_counter_SB.setEnabled(False)
+        table_side_grid.addWidget(self.cycle_counter_SB,1,1)
         
         
         table_side_v_lay.addLayout(table_side_grid)
@@ -511,7 +521,6 @@ class Widget(QWidget):
         Args:
             index (_type_): index to change
         """
-        # print(f"value {index}")
         if self.motor_value_SLIDER[index].value() != self.motor_value_SB[index].value():
             self.motor_value_SB[index].setValue(self.motor_value_SLIDER[index].value())
             self.pinnae.set_motor_angle(index,self.motor_value_SLIDER[index].value())
