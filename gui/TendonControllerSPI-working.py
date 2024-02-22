@@ -702,27 +702,30 @@ class Widget(QWidget):
 
         if not self.instructionThreadRunning:
              # ~ dataArray = np.zeros((self.inputT.rowCount(),12),dtype=np.byte)
-             dataArray = [bytearray(12) for _ in range(self.inputT.rowCount())]
+             dataArray = [bytearray(13) for _ in range(self.inputT.rowCount())]
              
              for row in range(self.inputT.rowCount()):
+                 # this is used to tell mcu which motor to set new zero position
+                 dataArray[row][0] = 0
+
                  val = int(self.inputT.item(row,0).text())
-                 dataArray[row][0] = (val >> 8) & 0xff
-                 dataArray[row][1] = val & 0xff
+                 dataArray[row][1] = (val >> 8) & 0xff
+                 dataArray[row][2] = val & 0xff
                  val = int(self.inputT.item(row,1).text())
-                 dataArray[row][2] = (val >> 8) & 0xff
-                 dataArray[row][3] = val & 0xff
+                 dataArray[row][3] = (val >> 8) & 0xff
+                 dataArray[row][4] = val & 0xff
                  val = int(self.inputT.item(row,2).text())
-                 dataArray[row][4] = (val >> 8) & 0xff
-                 dataArray[row][5] = val & 0xff
+                 dataArray[row][5] = (val >> 8) & 0xff
+                 dataArray[row][6] = val & 0xff
                  val = int(self.inputT.item(row,3).text())
-                 dataArray[row][6] = (val >> 8) & 0xff
-                 dataArray[row][7] = val & 0xff
+                 dataArray[row][7] = (val >> 8) & 0xff
+                 dataArray[row][8] = val & 0xff
                  val = int(self.inputT.item(row,4).text())
-                 dataArray[row][8] = (val >> 8) & 0xff
-                 dataArray[row][9] = val & 0xff
+                 dataArray[row][9] = (val >> 8) & 0xff
+                 dataArray[row][10] = val & 0xff
                  val = int(self.inputT.item(row,5).text())
-                 dataArray[row][10] = (val >> 8) & 0xff
-                 dataArray[row][11] = val & 0xff
+                 dataArray[row][11] = (val >> 8) & 0xff
+                 dataArray[row][12] = val & 0xff
                  
         
              # print(dataArray)
