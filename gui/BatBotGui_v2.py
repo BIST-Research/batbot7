@@ -72,6 +72,10 @@ class Widget(QWidget):
     
     pinnae = PinnaeController()
     
+    instructionThread = None
+    instructionThreadRunning = False
+
+
     def __init__(self):
         """Adds all the widgets to GUI"""
         QWidget.__init__(self)
@@ -401,8 +405,7 @@ class Widget(QWidget):
         vertical_layout = QVBoxLayout()
         vertical_layout.addLayout(control_h_lay)
         
-        # attach callbacks for controller tendon api
-        self.add_motor_control_CB()
+ 
         
         hLay = QHBoxLayout()
         # add the instruction table
@@ -421,6 +424,7 @@ class Widget(QWidget):
         # create start button
         table_side_grid = QGridLayout()
         self.start_stop_instruction_PB = QPushButton("Start")
+        self.start_stop_instruction_PB.pressed.connect(self.start_stop_instruction_PB_pressed_CB)
         table_side_grid.addWidget(self.start_stop_instruction_PB,0,0)
         
         # acuation rate
@@ -435,8 +439,24 @@ class Widget(QWidget):
         self.cycle_counter_SB = QSpinBox()
         self.cycle_counter_SB.setEnabled(False)
         table_side_grid.addWidget(self.cycle_counter_SB,1,1)
+
+        # add context menu 
+        self.instruction_TABLE.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.instruction_TABLE.customContextMenuRequested.connect(self.instruction_TABLE_contextMenu)
         
-        
+        # connect instruction table cell change callback
+        self.instruction_TABLE.cellChanged.connect(self.instruction_TABLE_cellChanged_callback)
+
+        # set default values in table
+        for i in range(number_motors):
+            intNum = QTableWidgetItem()
+            intNum.setData(0,0)
+            self.instruction_TABLE.setItem(0,i,intNum)
+
+
+        # attach callbacks for controller tendon api
+        self.add_motor_control_CB()
+
         table_side_v_lay.addLayout(table_side_grid)
 
         hLay.addLayout(table_side_v_lay)        
@@ -444,7 +464,155 @@ class Widget(QWidget):
         
         self.pinnae_controls_GB.setLayout(vertical_layout)
         self.mainVLay.addWidget(self.pinnae_controls_GB)
+
+    def instruction_TABLE_cellChanged_callback(self,row,column):
+        """called when table cell values are changed
+
+        Args:
+            row (int): row index
+            column (int): col index
+        """
+        logging.debug("instruction_TABLE_cellChanged")
+
+        new_value = float(self.instruction_TABLE.item(row,column).text())
+        # clamp against max value
+        if new_value > self.pinnae.get_motor_max_limit(column):
+            # clamp the value
+            newItem = QTableWidgetItem()
+            newItem.setData(0,int(self.pinnae.get_motor_max_limit(column)))
+            print(self.pinnae.get_motor_max_limit(column))
+            self.instruction_TABLE.setItem(row,column,newItem)
+            logging.debug("Clamped value max")
+
+        # clamp against min value
+        if new_value < self.pinnae.get_motor_min_limit(column):
+            # clamp
+            newItem = QTableWidgetItem()
+            newItem.setData(0,int(self.pinnae.get_motor_min_limit(column)))
+            self.instruction_TABLE.setItem(row,column,newItem)
+            logging.debug("Clamped value min")
         
+    def start_stop_instruction_PB_pressed_CB(self):
+        if not self.instructionThreadRunning:
+             rows = self.instruction_TABLE.rowCount()
+             dataArray = np.zeros((rows,6),np.int16)
+             
+             for row in range(self.instruction_TABLE.rowCount()):
+                 dataArray[row][0] = int(self.instruction_TABLE.item(row,0).text())
+                 dataArray[row][1] = int(self.instruction_TABLE.item(row,1).text())
+                 dataArray[row][2] = int(self.instruction_TABLE.item(row,2).text())
+                 dataArray[row][3] = int(self.instruction_TABLE.item(row,3).text())
+                 dataArray[row][4] = int(self.instruction_TABLE.item(row,4).text())
+                 dataArray[row][5] = int(self.instruction_TABLE.item(row,5).text())
+                 
+        
+             # print(dataArray)
+             self.instructionThread = RunInstructionsThread(dataArray,self.intstruction_speed_SB.value(),self.pinnae)
+             self.instructionThread.start()
+             self.instructionThread.cycle_complete.connect(self.cycle_complete_emit_callback)
+             self.instructionThread.end_motor_angles.connect(self.end_motor_values_emit_callback)
+             self.instructionThreadRunning = True
+             self.start_stop_instruction_PB.setText("Stop")
+        else:
+             self.instructionThreadRunning = False
+             self.start_stop_instruction_PB.setText("Start")
+             if self.instructionThread is not None and self.instructionThread.isRunning():
+                 self.instructionThread.stop()
+
+    def cycle_complete_emit_callback(self,dataIn):
+        self.cycle_counter_SB.setValue(dataIn)
+
+    def end_motor_values_emit_callback(self,dataIn):
+        for i in range(6):
+            self.motor_value_SB[i].setValue(dataIn[i])
+
+    def instruction_TABLE_contextMenu(self,position):
+        context_menu = QMenu()
+
+        add_row_action = context_menu.addAction("Add Row")
+        delete_row_action = context_menu.addAction("Delete Row")
+        duplicate_row_action = context_menu.addAction("Duplicate Row")
+        paste_max_action = context_menu.addAction("Paste Max's")
+        paste_min_action = context_menu.addAction("Paste Min's")
+        paste_current_angles_action = context_menu.addAction("Paste Current Angles")
+        action = context_menu.exec(self.instruction_TABLE.viewport().mapToGlobal(position))
+        
+        if action == add_row_action:
+            self.instruction_TABLE_contextMenu_add_row()
+        elif action == delete_row_action:
+            self.instruction_TABLE_contextMenu_delete_row()
+        elif action == duplicate_row_action:
+            self.instruction_TABLE_contextMenu_duplicate_row()
+        elif action == paste_max_action:
+            self.instruction_TABLE_contextMenu_paste_maxs()
+        elif action == paste_min_action:
+            self.instruction_TABLE_contextMenu_paste_mins()
+        elif action == paste_current_angles_action:
+            self.instruction_TABLE_contextMenu_paste_current()
+
+    def instruction_TABLE_contextMenu_add_row(self):
+        rows = self.instruction_TABLE.rowCount() +1
+        self.instruction_TABLE.setRowCount(rows)
+        self.instruction_TABLE.update()
+
+        for i in range(6):
+            intNum = QTableWidgetItem()
+
+            # instead of putting zero we just put the median value
+            # max = self.pinnae.get_motor_max_limit(i)
+            min = int(self.pinnae.get_motor_min_limit(i))
+            intNum.setData(0,min)
+            self.instruction_TABLE.setItem(rows-1,i,intNum)
+
+
+    def instruction_TABLE_contextMenu_delete_row(self):
+        if self.instruction_TABLE.currentRow() >= 0:
+            self.instruction_TABLE.removeRow(self.instruction_TABLE.currentRow())
+            logging.debug("deleted row")
+
+        if self.instruction_TABLE.rowCount() == 0:
+            self.instruction_TABLE_contextMenu_add_row()
+
+    def instruction_TABLE_contextMenu_duplicate_row(self):
+        selected_row = self.instruction_TABLE.currentRow()
+        num_rows = self.instruction_TABLE.rowCount()
+
+        if selected_row >=0:
+            row_items = [self.instruction_TABLE.item(selected_row,col).text() for col in range(6)]
+            self.instruction_TABLE.setRowCount(num_rows+1)
+
+            for col,text in enumerate(row_items):
+                newItem = QTableWidgetItem()
+                newItem.setData(0,int(text))
+                self.instruction_TABLE.setItem(num_rows,col,newItem)
+
+    def instruction_TABLE_contextMenu_paste_maxs(self):
+        selected_row = self.instruction_TABLE.currentRow()
+
+        if selected_row >=0:
+            for col, max_val in enumerate(self.motor_max_limit_SB):
+                newItem = QTableWidgetItem()
+                newItem.setData(0,int(max_val.value()))
+                self.instruction_TABLE.setItem(selected_row,col,newItem)
+
+    def instruction_TABLE_contextMenu_paste_mins(self):
+        selected_row = self.instruction_TABLE.currentRow()
+
+        if selected_row >=0:
+            for col, min_val in enumerate(self.motor_min_limit_SB):
+                newItem = QTableWidgetItem()
+                newItem.setData(0,int(min_val.value()))
+                self.instruction_TABLE.setItem(selected_row,col,newItem)
+
+    def instruction_TABLE_contextMenu_paste_current(self):
+        selected_row = self.instruction_TABLE.currentRow()
+
+        if selected_row >=0:
+            for col, motor_val in enumerate(self.motor_value_SB):
+                newItem = QTableWidgetItem()
+                newItem.setData(0,int(motor_val.value()))
+                self.instruction_TABLE.setItem(selected_row,col,newItem)
+
     def add_motor_control_CB(self):
         """Connects the motor tendons sliders to the api"""
         
@@ -557,6 +725,11 @@ class Widget(QWidget):
             [min,max] = self.pinnae.get_motor_limit(index)
             self.motor_value_SLIDER[index].setRange(min,max)
             self.motor_value_SB[index].setRange(min,max)
+            
+            num_rows = self.instruction_TABLE.rowCount()
+            for i in range(num_rows):
+                self.instruction_TABLE_cellChanged_callback(i,index)
+
         else:
             self.motor_max_limit_SB[index].setValue(self.pinnae.get_motor_max_limit(index))
             error_msg = QErrorMessage(self)
@@ -575,6 +748,10 @@ class Widget(QWidget):
             [min,max] = self.pinnae.get_motor_limit(index)
             self.motor_value_SLIDER[index].setRange(min,max)
             self.motor_value_SB[index].setRange(min,max)
+
+            num_rows = self.instruction_TABLE.rowCount()
+            for i in range(num_rows):
+                self.instruction_TABLE_cellChanged_callback(i,index)
         else:
             self.motor_min_limit_SB[index].setValue(self.pinnae.get_motor_min_limit(index))
             error_msg = QErrorMessage(self)
@@ -691,6 +868,40 @@ class Widget(QWidget):
         plt.close('all')
         event.accept()
         
+class RunInstructionsThread(QThread):
+    cycle_complete = pyqtSignal(int)
+    end_motor_angles = pyqtSignal(list)
+
+    def __init__(self,dataArray,freq,pinnae_obj: PinnaeController):
+        QThread.__init__(self)
+        self.data = dataArray
+        self.timeBetween = 1/freq
+        self.runThread = True
+        self.curIndex = 0
+        self.maxIndex = len(dataArray)
+        self.pinnae = pinnae_obj
+        self.cycle_count = 0
+        
+    def run(self):
+        logging.debug("RunInstructionsThread starting")
+        while self.runThread:
+            self.pinnae.set_motor_angles(self.data[self.curIndex])
+            print(self.data[self.curIndex])
+            self.curIndex+=1
+            if self.curIndex >= self.maxIndex:
+                self.curIndex = 0
+                self.cycle_count += 1
+                self.cycle_complete.emit(self.cycle_count)
+            
+            time.sleep(self.timeBetween)
+        
+        self.end_motor_angles.emit(self.pinnae.current_angles)
+        logging.debug("RunInstructionsThread exiting")
+        
+    def stop(self):
+        self.runThread = False
+
+
 if __name__ == "__main__":
     app = QApplication([])
     widget = Widget()

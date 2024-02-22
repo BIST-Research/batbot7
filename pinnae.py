@@ -205,8 +205,19 @@ class PinnaeController:
 
 
     def set_motor_angles(self,angles:np.int16)->bool:
-        if not isinstance(angles,list) or len(angles) != NUM_PINNAE_MOTORS:
+        # if not isinstance(angles,list) or len(angles) != NUM_PINNAE_MOTORS:
+        #     return False
+        
+        if not isinstance(angles,list) and not isinstance(angles,np.ndarray):
             return False
+        
+        if isinstance(angles,list):
+            if len(angles) != NUM_PINNAE_MOTORS:
+                return False
+            
+        if isinstance(angles,np.ndarray):
+            if angles.size != NUM_PINNAE_MOTORS:
+                return False
         
         
         # check if values in range
