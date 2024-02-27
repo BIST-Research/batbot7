@@ -48,11 +48,12 @@ class PinnaeController:
         bytes and send them
 
         """
-        data_buffer = np.zeros(NUM_PINNAE_MOTORS*2 + 1,dtype=np.byte)
+        data_buffer = np.zeros( 13,dtype=np.byte)
 
         # first index is for setting telling MCU to use its current encoder 
         # angle as the zero, we will just set for zero
-        data_buffer[0] = zero_index+1
+        # data_buffer[0] = zero_index+1
+        
         
         # first motor
         data_buffer[1] = (self.current_angles[0] >> 8) & 0xff
