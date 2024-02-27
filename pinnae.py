@@ -52,7 +52,7 @@ class PinnaeController:
 
         # first index is for setting telling MCU to use its current encoder 
         # angle as the zero, we will just set for zero
-        # data_buffer[0] = zero_index+1
+        data_buffer[0] = zero_index+1
         
         
         # first motor
