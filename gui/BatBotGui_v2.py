@@ -282,7 +282,7 @@ class Widget(QWidget):
         
         control_h_lay = QHBoxLayout()
         
-        motor_GB = [
+        self.motor_GB = [
             QGroupBox("Motor 1"),
             QGroupBox("Motor 2"),
             QGroupBox("Motor 3"),
@@ -397,10 +397,10 @@ class Widget(QWidget):
             # add set zero
             vertical_layout.addWidget(self.motor_set_zero_PB[index])
         
-            motor_GB[index].setMaximumWidth(160)
+            self.motor_GB[index].setMaximumWidth(160)
             
-            motor_GB[index].setLayout(vertical_layout)
-            control_h_lay.addWidget(motor_GB[index])
+            self.motor_GB[index].setLayout(vertical_layout)
+            control_h_lay.addWidget(self.motor_GB[index])
         
         vertical_layout = QVBoxLayout()
         vertical_layout.addLayout(control_h_lay)
@@ -464,6 +464,15 @@ class Widget(QWidget):
         
         self.pinnae_controls_GB.setLayout(vertical_layout)
         self.mainVLay.addWidget(self.pinnae_controls_GB)
+        
+    def set_motor_GB_enabled(self, enabled:bool)->None:
+        """Sets the motor control boxes to desired state making the user not able to touch them
+
+        Args:
+            enabled (bool): state to set control box
+        """
+        for i in range(6):
+            self.motor_GB[i].setEnabled(enabled)
 
     def instruction_TABLE_cellChanged_callback(self,row,column):
         """called when table cell values are changed
@@ -513,8 +522,10 @@ class Widget(QWidget):
              self.instructionThread.end_motor_angles.connect(self.end_motor_values_emit_callback)
              self.instructionThreadRunning = True
              self.start_stop_instruction_PB.setText("Stop")
+             self.set_motor_GB_enabled(False)
             #  self.pinnae_controls_GB.setEnabled(False)
         else:
+             self.set_motor_GB_enabled(True)
             #  self.pinnae_controls_GB.setEnabled(True)
              self.instructionThreadRunning = False
              self.start_stop_instruction_PB.setText("Start")
