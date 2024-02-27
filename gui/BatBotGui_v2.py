@@ -806,7 +806,7 @@ class Widget(QWidget):
         # left pinnae spectogram
         hLay = QHBoxLayout()
         self.leftPinnaeSpec = MplCanvas(self,width=5,height=4,dpi=100)
-        self.leftPinnaeSpec.axes.set_title("Left Pinnae")
+        self.leftPinnaeSpec.axes.set_title("Left Pinna")
         
         Time_difference = 0.0001
         Time_Array = np.linspace(0, 5, math.ceil(5 / Time_difference))
@@ -840,7 +840,7 @@ class Widget(QWidget):
         # ---------------------------------------------
         # right pinnae spectogram
         self.rightPinnaeSpec = MplCanvas(self,width=5,height=4,dpi=100)
-        self.rightPinnaeSpec.axes.set_title("Right Pinnae")
+        self.rightPinnaeSpec.axes.set_title("Right Pinna")
         Time_difference = 0.0001
         Time_Array = np.linspace(0, 5, math.ceil(5 / Time_difference))
         Data = 20*(np.sin(3 * np.pi * Time_Array))
