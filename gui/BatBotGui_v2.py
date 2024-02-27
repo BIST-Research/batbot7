@@ -523,10 +523,9 @@ class Widget(QWidget):
              self.instructionThreadRunning = True
              self.start_stop_instruction_PB.setText("Stop")
              self.set_motor_GB_enabled(False)
-            #  self.pinnae_controls_GB.setEnabled(False)
         else:
-             self.set_motor_GB_enabled(True)
-            #  self.pinnae_controls_GB.setEnabled(True)
+            # see end_motor_values_emit_callback for enabling - we want to update values first before enabling
+            #  self.set_motor_GB_enabled(True)
              self.instructionThreadRunning = False
              self.start_stop_instruction_PB.setText("Start")
              if self.instructionThread is not None and self.instructionThread.isRunning():
@@ -545,6 +544,7 @@ class Widget(QWidget):
             
             self.motor_value_SB[i].blockSignals(False)
             self.motor_value_SLIDER[i].blockSignals(False)
+        self.set_motor_GB_enabled(True)
 
     def instruction_TABLE_contextMenu(self,position):
         context_menu = QMenu()
