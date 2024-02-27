@@ -38,7 +38,7 @@ class PinnaeController:
         self.spi = SpiDev()
         self.spi.open(spi_bus,spi_select)
         self.spi.mode = 0
-        # self.spi.max_speed_hz = 500000
+        self.spi.max_speed_hz = 500000
         
 
     def send_MCU_angles(self,zero_index = -1) -> None:
