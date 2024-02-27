@@ -513,9 +513,9 @@ class Widget(QWidget):
              self.instructionThread.end_motor_angles.connect(self.end_motor_values_emit_callback)
              self.instructionThreadRunning = True
              self.start_stop_instruction_PB.setText("Stop")
-             self.pinnae_controls_GB.setEnabled(False)
+            #  self.pinnae_controls_GB.setEnabled(False)
         else:
-             self.pinnae_controls_GB.setEnabled(True)
+            #  self.pinnae_controls_GB.setEnabled(True)
              self.instructionThreadRunning = False
              self.start_stop_instruction_PB.setText("Start")
              if self.instructionThread is not None and self.instructionThread.isRunning():
