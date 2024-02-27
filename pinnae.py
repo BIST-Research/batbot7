@@ -81,7 +81,6 @@ class PinnaeController:
         
         # convert the data to list so we can send it
         write_data = data_buffer.tolist()
-        print(write_data)
         self.spi.xfer2(write_data)
         
         
