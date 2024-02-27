@@ -38,7 +38,7 @@ class PinnaeController:
         self.spi = SpiDev()
         self.spi.open(spi_bus,spi_select)
         self.spi.mode = 0
-        self.spi.max_speed_hz = 500000
+        self.spi.max_speed_hz = 25e6 # 25MHz
         
 
     def send_MCU_angles(self,zero_index = -1) -> None:
@@ -200,7 +200,7 @@ class PinnaeController:
         
         # set the angle
         self.current_angles[motor_index] = angle
-        logging.debug(f"Success setting motor {motor_index} to {angle}")
+        # logging.debug(f"Success setting motor {motor_index} to {angle}")
         self.send_MCU_angles()
         return True
 
