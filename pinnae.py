@@ -82,7 +82,7 @@ class PinnaeController:
         write_data = data_buffer.tolist()
         print(write_data)
         self.spi.xfer2(write_data)
-        return write_data
+        
         
 
 
