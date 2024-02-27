@@ -526,7 +526,14 @@ class Widget(QWidget):
 
     def end_motor_values_emit_callback(self,dataIn):
         for i in range(6):
+            self.motor_value_SB[i].blockSignals(True)
+            self.motor_value_SLIDER[i].blockSignals(True)
+            
             self.motor_value_SB[i].setValue(dataIn[i])
+            self.motor_value_SLIDER[i].setValue(dataIn[i])
+            
+            self.motor_value_SB[i].blockSignals(False)
+            self.motor_value_SLIDER[i].blockSignals(False)
 
     def instruction_TABLE_contextMenu(self,position):
         context_menu = QMenu()
