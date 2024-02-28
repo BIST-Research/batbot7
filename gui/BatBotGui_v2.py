@@ -63,6 +63,8 @@ from pinnae import PinnaeController
 # frequency of dac and adc
 DAC_ADC_FREQ = 1e6
 
+NUM_PINNAE = 7
+
 class Widget(QWidget):
     """GUI for controlling Bat Bot"""
     
@@ -288,10 +290,12 @@ class Widget(QWidget):
             QGroupBox("Motor 3"),
             QGroupBox("Motor 4"),
             QGroupBox("Motor 5"),
-            QGroupBox("Motor 6")
+            QGroupBox("Motor 6"),
+            QGroupBox("Motor 7")
         ]
 
         self.motor_max_PB = [
+            QPushButton("Max"),
             QPushButton("Max"),
             QPushButton("Max"),
             QPushButton("Max"),
@@ -307,9 +311,11 @@ class Widget(QWidget):
             QPushButton("Min"),
             QPushButton("Min"),
             QPushButton("Min"),
+            QPushButton("Min"),
         ]
 
         self.motor_max_limit_SB = [
+            QSpinBox(),
             QSpinBox(),
             QSpinBox(),
             QSpinBox(),
@@ -324,10 +330,12 @@ class Widget(QWidget):
             QSpinBox(),
             QSpinBox(),
             QSpinBox(),
+            QSpinBox(),
             QSpinBox()
         ]
 
         self.motor_value_SB = [
+            QSpinBox(),
             QSpinBox(),
             QSpinBox(),
             QSpinBox(),
@@ -343,6 +351,7 @@ class Widget(QWidget):
             QSlider(Qt.Orientation.Vertical),
             QSlider(Qt.Orientation.Vertical),
             QSlider(Qt.Orientation.Vertical),
+            QSlider(Qt.Orientation.Vertical),
         ]
         
         self.motor_set_zero_PB = [
@@ -351,13 +360,14 @@ class Widget(QWidget):
             QPushButton("Set Zero"),
             QPushButton("Set Zero"),
             QPushButton("Set Zero"),
+            QPushButton("Set Zero"),
             QPushButton("Set Zero")
         ]
         
-        number_motors = 6
+        # number_motors = 6
         max_value = 10000
         
-        for index in range(number_motors):
+        for index in range(NUM_PINNAE):
             vertical_layout = QVBoxLayout()
             
             temp_CB = QGroupBox("Control")
@@ -409,7 +419,7 @@ class Widget(QWidget):
         
         hLay = QHBoxLayout()
         # add the instruction table
-        self.instruction_TABLE = QTableWidget(1,number_motors)
+        self.instruction_TABLE = QTableWidget(1,NUM_PINNAE)
         hLay.addWidget(self.instruction_TABLE)
         
         
@@ -448,7 +458,7 @@ class Widget(QWidget):
         self.instruction_TABLE.cellChanged.connect(self.instruction_TABLE_cellChanged_callback)
 
         # set default values in table
-        for i in range(number_motors):
+        for i in range(NUM_PINNAE):
             intNum = QTableWidgetItem()
             intNum.setData(0,0)
             self.instruction_TABLE.setItem(0,i,intNum)
@@ -471,7 +481,7 @@ class Widget(QWidget):
         Args:
             enabled (bool): state to set control box
         """
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_GB[i].setEnabled(enabled)
 
     def instruction_TABLE_cellChanged_callback(self,row,column):
@@ -513,6 +523,7 @@ class Widget(QWidget):
                  dataArray[row][3] = int(self.instruction_TABLE.item(row,3).text())
                  dataArray[row][4] = int(self.instruction_TABLE.item(row,4).text())
                  dataArray[row][5] = int(self.instruction_TABLE.item(row,5).text())
+                 dataArray[row][6] = int(self.instruction_TABLE.item(row,6).text())
                  
         
              # print(dataArray)
@@ -535,7 +546,7 @@ class Widget(QWidget):
         self.cycle_counter_SB.setValue(dataIn)
 
     def end_motor_values_emit_callback(self,dataIn):
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_value_SB[i].blockSignals(True)
             self.motor_value_SLIDER[i].blockSignals(True)
             
@@ -575,11 +586,9 @@ class Widget(QWidget):
         self.instruction_TABLE.setRowCount(rows)
         self.instruction_TABLE.update()
 
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             intNum = QTableWidgetItem()
 
-            # instead of putting zero we just put the median value
-            # max = self.pinnae.get_motor_max_limit(i)
             min = int(self.pinnae.get_motor_min_limit(i))
             intNum.setData(0,min)
             self.instruction_TABLE.setItem(rows-1,i,intNum)
@@ -598,7 +607,7 @@ class Widget(QWidget):
         num_rows = self.instruction_TABLE.rowCount()
 
         if selected_row >=0:
-            row_items = [self.instruction_TABLE.item(selected_row,col).text() for col in range(6)]
+            row_items = [self.instruction_TABLE.item(selected_row,col).text() for col in range(NUM_PINNAE)]
             self.instruction_TABLE.setRowCount(num_rows+1)
 
             for col,text in enumerate(row_items):
@@ -637,37 +646,37 @@ class Widget(QWidget):
         """Connects the motor tendons sliders to the api"""
         
         # attach max buttons
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_max_PB[i].pressed.connect(lambda index=i: self.motor_max_PB_pressed(index))
         
         # attach max limit spinbox
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_max_limit_SB[i].editingFinished.connect(lambda index=i: self.motor_max_limit_changed_CB(index))
 
             
         # attach min buttons
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_min_PB[i].pressed.connect(lambda index=i: self.motor_min_PB_pressed(index))
 
         # attach min limit spinbox
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_min_limit_SB[i].editingFinished.connect(lambda index=i: self.motor_min_limit_changed_CB(index))
             
             
         # attach set to zero buttons
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_set_zero_PB[i].pressed.connect(lambda index=i: self.motor_set_zero_PB_callback(index))
 
         # attach sliders
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_value_SLIDER[i].valueChanged.connect(lambda value, index=i: self.motor_value_SLIDER_valueChanged(index))
         
         # attach spinbox
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_value_SB[i].editingFinished.connect(lambda index=i: self.motor_value_SB_valueChanged(index))
             
         # adjust the slider and spinbox range
-        for i in range(6):
+        for i in range(NUM_PINNAE):
             self.motor_max_limit_changed_CB(i)
         
     def motor_max_PB_pressed(self,index):

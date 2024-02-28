@@ -19,5 +19,18 @@ class fake_SpiDev():
     def open(self,bus,dev):
         logging.debug("fake open")
         
-    def xfer2(data,de):
+    def xfer2(de,data:list):
         logging.debug("fake xfer2")
+        chunked_data = []
+        index = 1
+        chunked_data.append(data[0])
+
+        # view the bytes being sent
+        for i, item in enumerate(data):
+            if i > 0:
+                if i % 2 == 0:
+                    chunked_data[index] |= item
+                    index +=1
+                else:
+                    chunked_data.append(item << 8)
+        print(chunked_data)

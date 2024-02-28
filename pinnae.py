@@ -15,7 +15,7 @@ except ImportError:
     from fake_spidev import fake_SpiDev as SpiDev
 
 # global variables holding number of motors in A ear
-NUM_PINNAE_MOTORS = 6
+NUM_PINNAE_MOTORS = 7
 
 # setting the limits on each motor
 DEFAULT_MIN_ANGLE_LIMIT = -180
@@ -42,13 +42,13 @@ class PinnaeController:
         
 
     def send_MCU_angles(self,zero_index = -1) -> None:
-        """Sends all 6 of the angles to the Grand Central, 
+        """Sends all 7 of the angles to the Grand Central, 
         in a fashion of 2 bytes for each motor angle. The original 
         angles are represented as signed 16 int, here we break them into 
         bytes and send them
 
         """
-        data_buffer = np.zeros( 13,dtype=np.byte)
+        data_buffer = np.zeros( NUM_PINNAE_MOTORS*2 +1,dtype=np.byte)
 
         # first index is for setting telling MCU to use its current encoder 
         # angle as the zero, we will just set for zero
@@ -78,6 +78,10 @@ class PinnaeController:
         # sixth motor
         data_buffer[11] = (self.current_angles[5] >> 8) & 0xff
         data_buffer[12] =  self.current_angles[5] & 0xff
+        
+        # seventh motor
+        data_buffer[13] = (self.current_angles[6] >> 8) & 0xff
+        data_buffer[14] =  self.current_angles[6] & 0xff
         
         # convert the data to list so we can send it
         write_data = data_buffer.tolist()
@@ -153,6 +157,8 @@ class PinnaeController:
         Returns:
             np.int16: [min_angle,max_angle]
         """
+
+        assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} greater than NUM_PINNAE_MOTORS: {NUM_PINNAE_MOTORS}"
         return(self.min_angle_limits[motor_index],self.max_angle_limits[motor_index])
     
     def get_motor_max_limit(self,motor_index:np.uint8)->np.int16:
@@ -164,6 +170,7 @@ class PinnaeController:
         Returns:
             np.int16: current max value
         """
+        assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} greater than NUM_PINNAE_MOTORS: {NUM_PINNAE_MOTORS}"
         return(self.max_angle_limits[motor_index])
 
     def get_motor_min_limit(self,motor_index:np.uint8)->np.int16:
@@ -175,6 +182,7 @@ class PinnaeController:
         Returns:
             np.int16: current min value
         """
+        assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} greater than NUM_PINNAE_MOTORS: {NUM_PINNAE_MOTORS}"
         return(self.min_angle_limits[motor_index])
 
 
@@ -194,21 +202,18 @@ class PinnaeController:
         Returns:
             bool: _description_
         """
+        assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} greater than NUM_PINNAE_MOTORS: {NUM_PINNAE_MOTORS}"
         if angle > self.max_angle_limits[motor_index] or angle < self.min_angle_limits[motor_index]:
             logging.error("set_motor_angle: angle out of limits!")
             return False
         
         # set the angle
         self.current_angles[motor_index] = angle
-        # logging.debug(f"Success setting motor {motor_index} to {angle}")
         self.send_MCU_angles()
         return True
 
 
-    def set_motor_angles(self,angles:np.int16)->bool:
-        # if not isinstance(angles,list) or len(angles) != NUM_PINNAE_MOTORS:
-        #     return False
-        
+    def set_motor_angles(self,angles:np.int16)->bool:        
         if not isinstance(angles,list) and not isinstance(angles,np.ndarray):
             return False
         
