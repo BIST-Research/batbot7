@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
     QSpacerItem,
     QDoubleSpinBox,
     QSizePolicy,
+    QButtonGroup,
+    QRadioButton,
     QErrorMessage
 
 )
@@ -126,6 +128,25 @@ class Widget(QWidget):
         directory_GB.setLayout(directory_grid)
         
         # -------------------------------------------------------------------
+        # communication settings
+        mcu_grid = QGridLayout()
+        mcu_GB = QGroupBox("MCU Protocol")
+        
+        spi_CB = QCheckBox("SPI")
+        spi_CB.setChecked(True)
+        
+        uart_CB = QCheckBox("UART")
+        
+        self.mcu_protocol_BG = QButtonGroup()
+        self.mcu_protocol_BG.setExclusive(True)
+        self.mcu_protocol_BG.addButton(spi_CB)
+        self.mcu_protocol_BG.addButton(uart_CB)
+        
+        mcu_grid.addWidget(spi_CB)
+        mcu_grid.addWidget(uart_CB)
+        mcu_GB.setLayout(mcu_grid)
+        
+        # -------------------------------------------------------------------
         # settings for chirps
         chirp_GB = QGroupBox("Chirp && Listen Settings")
         chirp_grid = QGridLayout()
@@ -198,6 +219,7 @@ class Widget(QWidget):
         # put together two groupboxes
         hLay = QHBoxLayout()
         hLay.addWidget(directory_GB)
+        # hLay.addWidget(mcu_GB)
         hLay.addWidget(chirp_GB)
         
         self.chirp_settings_changed_callback()

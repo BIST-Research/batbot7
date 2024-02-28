@@ -5,6 +5,7 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.DEBUG)
 import argparse
+from serial import Serial
 
 # for developing on not the PI we create fake library
 # that mimics spidev
@@ -22,7 +23,7 @@ DEFAULT_MIN_ANGLE_LIMIT = -180
 DEFAULT_MAX_ANGLE_LIMIT = 180
 
 class PinnaeController:
-    def __init__(self,spi_bus=0,spi_select=0) -> None:
+    def __init__(self,spi_bus=0,spi_select=0,serial_dev:Serial = None) -> None:
         # holds the current angles of the motors
         self.current_angles = np.zeros(NUM_PINNAE_MOTORS,dtype=np.int16)
 
@@ -35,10 +36,20 @@ class PinnaeController:
         self.max_angle_limits[:] = DEFAULT_MAX_ANGLE_LIMIT
         
         ## for spidev library
+        self.using_spi = True
         self.spi = SpiDev()
         self.spi.open(spi_bus,spi_select)
         self.spi.mode = 0
         self.spi.max_speed_hz = 25000000 # 25MHz
+        
+        # if we are using serial (uart)
+        self.serial = serial_dev
+        
+        if serial_dev != None:
+            self.using_spi = False
+            logging.debug("Using Serial port instead of SPI")
+        else:
+            logging.debug("Using SPI to send data")
         
 
     def send_MCU_angles(self,zero_index = -1) -> None:
@@ -53,7 +64,6 @@ class PinnaeController:
         # first index is for setting telling MCU to use its current encoder 
         # angle as the zero, we will just set for zero
         data_buffer[0] = zero_index+1
-        
         
         # first motor
         data_buffer[1] = (self.current_angles[0] >> 8) & 0xff
@@ -85,7 +95,12 @@ class PinnaeController:
         
         # convert the data to list so we can send it
         write_data = data_buffer.tolist()
-        self.spi.xfer2(write_data)
+        
+        if self.using_spi:
+            self.spi.xfer2(write_data)
+        else:
+            self.serial.write(write_data)
+            
         
         
 
