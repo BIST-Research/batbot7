@@ -514,7 +514,7 @@ class Widget(QWidget):
     def start_stop_instruction_PB_pressed_CB(self):
         if not self.instructionThreadRunning:
              rows = self.instruction_TABLE.rowCount()
-             dataArray = np.zeros((rows,6),np.int16)
+             dataArray = np.zeros((rows,NUM_PINNAE),np.int16)
              
              for row in range(self.instruction_TABLE.rowCount()):
                  dataArray[row][0] = int(self.instruction_TABLE.item(row,0).text())
