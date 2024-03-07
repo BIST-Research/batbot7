@@ -19,13 +19,13 @@ except ImportError:
 NUM_PINNAE_MOTORS = 7
 
 # setting the limits on each motor
-DEFAULT_MIN_ANGLE_LIMIT = -180
-DEFAULT_MAX_ANGLE_LIMIT = 180
+DEFAULT_MIN_ANGLE_LIMIT = np.int16(-180)
+DEFAULT_MAX_ANGLE_LIMIT = np.int16(180)
 
 class PinnaeController:
     def __init__(self,spi_bus=0,spi_select=0,serial_dev:Serial = None) -> None:
         # holds the current angles of the motors
-        self.current_angles = np.zeros(NUM_PINNAE_MOTORS,dtype=np.int16)
+        self.current_angles = np.zeros(NUM_PINNAE_MOTORS, dtype=np.int16)
 
         ## holds the limits for the motor
         # holds the limits of the motors
@@ -59,7 +59,7 @@ class PinnaeController:
         bytes and send them
 
         """
-        data_buffer = np.zeros( NUM_PINNAE_MOTORS*2 +1,dtype=np.byte)
+        data_buffer = np.zeros( NUM_PINNAE_MOTORS*2 +1,dtype=np.uint8)
 
         # first index is for setting telling MCU to use its current encoder 
         # angle as the zero, we will just set for zero
@@ -247,7 +247,7 @@ class PinnaeController:
             return False
         
         # set the values
-        self.current_angles[:] = angles[:]
+        self.current_angles[:] = np.int16(angles[:])
         self.send_MCU_angles()
         return True
 
@@ -266,6 +266,15 @@ class PinnaeController:
         self.send_MCU_angles(motor_index)
         
         logging.debug(f"Setting motor: {motor_index} new zero position")
+        
+    def set_all_new_zero_position(self) ->None:
+        """Tells the MCU to accept the current encoder angle as its new zero position
+        """
+        for i in range(NUM_PINNAE_MOTORS):
+            self.current_angles[i] = 0
+            self.max_angle_limits[i] = DEFAULT_MAX_ANGLE_LIMIT
+            self.min_angle_limits[i] = DEFAULT_MIN_ANGLE_LIMIT
+            self.send_MCU_angles(i)
 
     # set motors to max angle
     def set_motor_to_max(self,motor_index:np.uint8)->None:

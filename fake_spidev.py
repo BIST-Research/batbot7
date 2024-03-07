@@ -8,6 +8,7 @@ nothing but log the information to console
     """
     
 import logging
+import numpy as np
 
 class fake_SpiDev():
     def __init__(self):
@@ -21,9 +22,9 @@ class fake_SpiDev():
         
     def xfer2(de,data:list):
         logging.debug("fake xfer2")
-        chunked_data = []
+        chunked_data = np.zeros(8, dtype=np.int16)
         index = 1
-        chunked_data.append(data[0])
+        chunked_data[0]= data[0]
 
         # view the bytes being sent
         for i, item in enumerate(data):
@@ -32,5 +33,5 @@ class fake_SpiDev():
                     chunked_data[index] |= item
                     index +=1
                 else:
-                    chunked_data.append(item << 8)
+                    chunked_data[index] = (item << 8)
         print(chunked_data)

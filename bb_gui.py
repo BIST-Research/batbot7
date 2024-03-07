@@ -427,9 +427,14 @@ class Widget(QWidget):
             vertical_layout.addLayout(grid_lay)
             
             # add set zero
-            vertical_layout.addWidget(self.motor_set_zero_PB[index])
+            # vertical_layout.addWidget(self.motor_set_zero_PB[index])
         
+            # set max width
             self.motor_GB[index].setMaximumWidth(160)
+            
+            # attach custom context menu
+            self.motor_GB[index].setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.motor_GB[index].customContextMenuRequested.connect(lambda pos,i = index: self.motor_GB_contextMenu(pos,i))
             
             self.motor_GB[index].setLayout(vertical_layout)
             control_h_lay.addWidget(self.motor_GB[index])
@@ -472,9 +477,11 @@ class Widget(QWidget):
         self.cycle_counter_SB.setEnabled(False)
         table_side_grid.addWidget(self.cycle_counter_SB,1,1)
 
-        # add context menu 
+        # add context menu for instruction table
         self.instruction_TABLE.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.instruction_TABLE.customContextMenuRequested.connect(self.instruction_TABLE_contextMenu)
+        
+     
         
         # connect instruction table cell change callback
         self.instruction_TABLE.cellChanged.connect(self.instruction_TABLE_cellChanged_callback)
@@ -496,6 +503,31 @@ class Widget(QWidget):
         
         self.pinnae_controls_GB.setLayout(vertical_layout)
         self.mainVLay.addWidget(self.pinnae_controls_GB)
+    
+    def motor_GB_contextMenu(self,position,index) -> None:
+        """Create menu for each motor box to reduce the number of buttons
+
+        Args:
+            position (int): passed from qt, position on context menu
+            index (int): which motor box this is coming from
+        """
+        assert index < NUM_PINNAE, f"{index} is greater than number of pinnaes!"
+        context_menu = QMenu()
+        context_menu.addMenu(f"Motor {index+1}:")
+        
+        set_zero = context_menu.addAction("Set Zero")
+        max_value = context_menu.addAction("Max")
+        min_value = context_menu.addAction("Min")
+        
+        action = context_menu.exec(self.motor_GB[index].mapToGlobal(position))
+        
+        if action == set_zero:
+            self.motor_set_zero_PB_callback(index)
+        elif action == max_value:
+            self.motor_max_PB_pressed(index)
+        elif action == min_value:
+            self.motor_min_PB_pressed(index)
+            
         
     def set_motor_GB_enabled(self, enabled:bool)->None:
         """Sets the motor control boxes to desired state making the user not able to touch them
@@ -811,26 +843,11 @@ class Widget(QWidget):
 #----------------------------------------------------------------------
     def init_echoControl_box(self):
         """Adds the sonar box layout"""
-        self.sonarControlBox = QGroupBox("Echos")
-        self.sonarControlBox.setMinimumHeight(300)
+        self.echo_GB = QGroupBox("Echos")
+        self.echo_GB.setMinimumHeight(300)
         vLay = QVBoxLayout()
 
         gridLay = QGridLayout()
-        # # show directory pulling from
-        # self.echoPlotDirectoryCB = QComboBox()
-        # self.echoPlotDirectoryCB.addItem(self.directory_TE.text() +self.experiment_folder_name_TE.text()+"/gpsdata")
-        # self.echoPlotDirectoryCB.setEditable(True)
-        # self.echoPlotDirectoryCB.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Preferred)
-        # gridLay.addWidget(QLabel("Plot Data:"),0,0)
-        # gridLay.addWidget(self.echoPlotDirectoryCB,0,1)
-        
-        # # show plots found
-        # self.plotsFoundLE = QLineEdit("0")
-        # self.plotsFoundLE.setReadOnly(True)
-
-        # gridLay.addWidget(QLabel("Plots found:"),0,2)
-        # gridLay.addWidget(self.plotsFoundLE,0,3)
-    
         vLay.addLayout(gridLay)
 
 
@@ -845,29 +862,6 @@ class Widget(QWidget):
         self.leftPinnaeSpec.axes.specgram(Data,Fs=6,cmap="rainbow")
         hLay.addWidget(self.leftPinnaeSpec)
 
-
-        # middle section---------------------------------
-        hLay2 = QHBoxLayout()
-
-        # plot check button
-        self.plotSpecCB = QCheckBox("Plot")
-        # hLay.addWidget(self.plotSpecCB)
-        hLay2.addWidget(self.plotSpecCB)
-
-        # refreshrate for plots
-        self.refreshRateSpecPlotsSB = QDoubleSpinBox()
-        self.refreshRateSpecPlotsSB.setSuffix(" Sec")
-        self.refreshRateSpecPlotsSB.setRange(0.1,100)
-        self.refreshRateSpecPlotsSB.setValue(1)
-        self.refreshRateSpecPlotsSB.setDecimals(1)
- 
-        # hLay.addWidget(QLabel("Plot Every:"))
-        # hLay.addWidget(self.refreshRateSpecPlotsSB)
-        hLay2.addWidget(QLabel("Plot Every:"))
-        hLay2.addWidget(self.refreshRateSpecPlotsSB)
-
-        vLay.addLayout(hLay2)
-
         # ---------------------------------------------
         # right pinnae spectogram
         self.rightPinnaeSpec = MplCanvas(self,width=5,height=4,dpi=100)
@@ -879,41 +873,17 @@ class Widget(QWidget):
         hLay.addWidget(self.rightPinnaeSpec)
 
         vLay.addLayout(hLay)
-        self.sonarControlBox.setLayout(vLay)
-
-    def init_GPS_box(self):
-        """Inits the gps box"""
-        self.gpsBox = QGroupBox("GPS")
-        hLay = QHBoxLayout()
-        gridLay = QGridLayout()
-
-        # fakemap = QTextEdit("this is a map")
-        fakemap = MplCanvas(self,width=5,height=4,dpi=100)
-        Time_difference = 0.0001
-        Time_Array = np.linspace(0, 5, math.ceil(5 / Time_difference))
-        Data = 20*(np.sin(3 * np.pi * Time_Array))
-        fakemap.axes.specgram(Data,Fs=6,cmap="rainbow")
-
-        
-        gridLay.addWidget(fakemap,0,0)
-
-        # name to save file
-        self.gpsFileNameTE = QLineEdit("gpsDataSave.txt")
-        gridLay.addWidget(QLabel("File Name:"),0,1)
-        gridLay.addWidget(self.gpsFileNameTE,0,2)
-        
-        self.gpsBox.setLayout(gridLay)
+        self.echo_GB.setLayout(vLay)
  
 
     def Add_Echo_GB(self):
         """adds sonar and gps box"""
         self.init_echoControl_box()
 
-        self.sonarAndGPSLay = QHBoxLayout()
-        self.sonarAndGPSLay.addWidget(self.sonarControlBox)
-        # self.sonarAndGPSLay.addWidget(self.gpsBox)
+        self.echo_layout = QHBoxLayout()
+        self.echo_layout.addWidget(self.echo_GB)
 
-        self.mainVLay.addLayout(self.sonarAndGPSLay)
+        self.mainVLay.addLayout(self.echo_layout)
         
     def closeEvent(self,event):
         plt.close('all')
