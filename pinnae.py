@@ -12,7 +12,7 @@ from serial import Serial
 try:
     from spidev import SpiDev
 except ImportError:
-    logging.error("no spidev found, developing on different os ")
+    logging.error("pinnae.py:: no spidev found, developing on different os ")
     from fake_spidev import fake_SpiDev as SpiDev
 
 # global variables holding number of motors in A ear
