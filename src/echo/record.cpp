@@ -130,6 +130,14 @@ void _init_record_dma(void)
 
 }
 
+void start_record(void)
+{
+  EVSYS->SWEVT.bit.CHANNEL0 = 0x01;
+  EVSYS->SWEVT.bit.CHANNEL1 = 0x01;
+
+  DOTSTAR_SET_BLUE();
+}
+
 // A2 --> PB08 (ADC0, AIN2, listenR)
 const ml_pin_settings adc0_pin = {PORT_GRP_B, 8, PF_B, PP_EVEN, ANALOG, DRIVE_OFF};
 // A3 --> PB09 (ADC1, AIN1, listenL)
@@ -137,6 +145,7 @@ const ml_pin_settings adc1_pin = {PORT_GRP_B, 9, PF_B, PP_ODD, ANALOG, DRIVE_OFF
 
 const ml_pin_settings record_trigger_pin = {PORT_GRP_A, 16, PF_A, PP_EVEN, INPUT_PULL_DOWN, DRIVE_OFF}; 
 
+#define RECORD_START 0x33
 
 void record_setup(void)
 {
@@ -193,9 +202,23 @@ uint16_t record_loop
 
     left_finished = right_finished = false;
 
+    //Serial.write(tx_buffer, SER_BUF_LEN);
     ser_ret_val |= (uint16_t)(TX_SONAR_RECORD_FRAME << 8);
     ser_ret_val |= SER_RET_WRITE;
     //write_buffer(tx_buffer, TX_SONAR_RECORD_FRAME);
+  }
+
+#ifdef SERIAL_TRIGGER
+  if(rx_frame_type == RECORD_START && !recording)
+  {
+    start_record();
+    recording = true;
+  }
+#endif
+
+  if(!recording)
+  {
+    ser_ret_val |= SER_RET_READ;
   }
 
   return ser_ret_val;
@@ -213,7 +236,7 @@ void DMAC_1_Handler(void)
   DMAC->Channel[1].CHINTFLAG.reg = DMAC_CHINTFLAG_MASK;
 }
 
-#if defined(BUILD_RECORD)
+#if defined(BUILD_RECORD) && defined(EIC_TRIGGER)
 void EIC_0_Handler(void)
 {
     // clr flags
@@ -223,11 +246,7 @@ void EIC_0_Handler(void)
 
     if(!recording)
     {
-      EVSYS->SWEVT.bit.CHANNEL0 = 0x01;
-      EVSYS->SWEVT.bit.CHANNEL1 = 0x01;
-
-      DOTSTAR_SET_GREEN();
-
+      start_record();
       recording = true;
     }
 }

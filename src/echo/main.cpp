@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <ml_clocks.h>
 #include <ml_port.h>
+#include <ml_tc_common.h>
+#include <ml_tc2.h>
 
 #include <serial_handler.hpp>
 #include <record.hpp>
@@ -23,6 +25,11 @@ void setup(void)
     dotstar_init();
     init_serial_handler();
 
+    TC2_init();
+    TC2_intset(true, false, false, false, true, 1);
+    TC_enable(TC2);
+    TC_force_stop(TC2);
+    
     ser_action = 0;
     rx_frame_type = RX_NONE;
 
@@ -44,7 +51,8 @@ void loop(void)
     ser_action = record_loop(rx_buffer, rx_frame_type, tx_buffer);
 #elif defined(BUILD_EMIT)
     ser_action = emit_loop(rx_buffer, rx_frame_type, tx_buffer);
-#endif //BUILD_RECORD
+#endif //BUILD_RECORF
+
 
     if(ser_action & SER_RET_WRITE)
     {
@@ -58,6 +66,32 @@ void loop(void)
 
     if(ser_action & SER_RET_READ)
     {
-        rx_frame_type = w_read_loop(rx_buffer);
+        if((rx_frame_type = w_read_loop(rx_buffer)) == RX_ERR)
+        {
+            TC_force_retrigger(TC2);
+        }
     }
+
+
 }
+
+void TC2_Handler(void)
+{
+    static _Bool blinker = true;
+
+    if(ML_TC_OVF_INTFLAG(TC2))
+    {
+        if(blinker)
+        {
+            DOTSTAR_SET_RED();
+        } else
+        {
+            DOTSTAR_SET_OFF();
+        }
+
+    }
+
+    blinker = !blinker;
+    ML_TC_CLR_INTFLAGS(TC2);
+}
+

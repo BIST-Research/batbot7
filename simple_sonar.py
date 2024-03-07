@@ -24,20 +24,24 @@ from ser_utils import *
 from emit import build_emit_upd
 from emit import validate_emit_upd
 
-from hw_defs import ADC_SAMPLING_RATE
+from hwdefs import ADC_SAMPLING_RATE
+from hwdefs import ADC_BYTE_RATE
 
-EMITTER_SERIAL_NO = '6A3E92CE5351523450202020FF0E4431'
-RECORDER_SERIAL_NO = 'E9139F095351523450202020FF0E3632'
+EMITTER_SERIAL_NO = 'DF7AE18B5351523450202020FF113537'
+#EMITTER_SERIAL_NO = '6A3E92CE5351523450202020FF0E4431'
+#RECORDER_SERIAL_NO = 'E9139F095351523450202020FF0E3632'
+RECORDER_SERIAL_NO = 'DF7AE18B5351523450202020FF113537'
 
 RECORD_TIME = 25E-3
 TIME_PER_CHUNK = 64/ADC_SAMPLING_RATE
-
 N_RECV_CHUNKS = int(RECORD_TIME//TIME_PER_CHUNK + 1)
 
 def read_fun(reader, mask):
     msg = reader.read(RAW_BUF_LEN)
     frame_type, decoded = decode_msg(bytearray(msg))
     return frame_type, decoded
+
+START_RECORD = 0x33
 
 if __name__ == '__main__':
 
@@ -59,19 +63,33 @@ if __name__ == '__main__':
     recorder = search_comports([RECORDER_SERIAL_NO])
     r_stream = serial.Serial(recorder.device, baudrate=USART_BAUD)
 
-    #sel = selectors.DefaultSelector()
-    #sel.register(r_stream, selectors.EVENT_READ, read_fun)
+    msg = encode_msg(bytearray([START_RECORD, 0x01, 0x00, 0x00, 0x00]))
 
+    r_stream.write(msg)
+    sel = selectors.DefaultSelector()
+    sel.register(r_stream, selectors.EVENT_READ, read_fun)
+
+    first = True
+    start_time = 0
     data = bytearray()
+    decode = bytearray()
     while nrecv < N_RECV_CHUNKS:
-        msg = r_stream.read(RAW_BUF_LEN)
-        frame_type, decoded = decode_msg(bytearray(msg))
-        #print(f"{nrecv}: {frame_type}: {array.array('H', decoded)}")
-        nrecv += 1
-
+        if not r_stream.in_waiting:
+            if first:
+                start_time = time.time()
+                first = False
+            tmp_time = time.time()
+            msg = r_stream.read(RAW_BUF_LEN)
+            print(time.time() - tmp_time)
+            frame_type, decoded = decode_msg(bytearray(msg))
+            decode.extend(decoded)
+            #print(f"{nrecv}: {frame_type}: {array.array('H', decoded)}")
+            nrecv += 1
+    print(time.time() - start_time)
+    print(len(decode))
         
         
-    print(len(data))
+    #print(len(data))
 
 
 

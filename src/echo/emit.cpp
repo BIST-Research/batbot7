@@ -191,11 +191,6 @@ uint16_t emit_loop
             n_chunks_cnt++;
         }
 
-        if(rx_frame_type == RX_ERR)
-        {
-            DOTSTAR_SET_RED();
-        }
-
         if(n_chunks_cnt == n_recv_chunks && !chirping)
         {
             // Clear eic interrupt so emission doesnt occur while copying to emit buffer
