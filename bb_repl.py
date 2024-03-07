@@ -58,7 +58,10 @@ class batbot(Cmd):
         
         for _ in range(repetitions):
             self.poutput('chirp..')
-            
+    
+    
+    def do_generate_chirpd(self,args)->None:
+        pass
             
 if __name__ == '__main__':
     bb = batbot()
