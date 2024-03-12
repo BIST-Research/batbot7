@@ -294,13 +294,16 @@ class Widget(QWidget):
             self.uart_connect_PB.setText("Disconnect")
             self.uart_search_PB.setEnabled(False)
             self.uart_name_CB.setEnabled(False)
+            self.set_motor_GB_enabled(True)
         except:
             self.uart_connect_PB.setText("Connect")
             self.uart_search_PB.setEnabled(True)
             self.uart_name_CB.setEnabled(True)
+            self.set_motor_GB_enabled(False)
             logging.error(f"FAILED TO CONNECT TO {port}")
             error_msg = QErrorMessage(self)
             error_msg.showMessage(f"Serial port: {port} did not work!")
+            
             
             
     
@@ -328,6 +331,7 @@ class Widget(QWidget):
             self.mcu_spi_options_pressed()
             self.pinnae.close_uart()
             self.uart_connect_PB.setText("Connect")
+            self.set_motor_GB_enabled(True)
         else:   # UART
             # remove spi stuff
             self.mcu_grid.removeWidget(self.spi_bus_SB)
@@ -342,6 +346,8 @@ class Widget(QWidget):
             self.uart_name_CB.setVisible(True)
             self.uart_connect_PB.setVisible(True)
             self.uart_search_PB.setVisible(True)
+            self.uart_search_PB.setEnabled(True)
+            self.set_motor_GB_enabled(False)
             
         
     def mcu_spi_options_pressed(self)->None:
@@ -660,8 +666,12 @@ class Widget(QWidget):
         Args:
             enabled (bool): state to set control box
         """
-        for i in range(NUM_PINNAE):
-            self.motor_GB[i].setEnabled(enabled)
+        try:
+            
+            for i in range(NUM_PINNAE):
+                self.motor_GB[i].setEnabled(enabled)
+        except:
+            pass
 
     def instruction_TABLE_cellChanged_callback(self,row,column):
         """called when table cell values are changed
