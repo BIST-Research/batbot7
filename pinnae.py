@@ -23,7 +23,7 @@ DEFAULT_MIN_ANGLE_LIMIT = np.int16(-180)
 DEFAULT_MAX_ANGLE_LIMIT = np.int16(180)
 
 class PinnaeController:
-    def __init__(self,spi_bus=0,spi_select=0,serial_dev:Serial = None) -> None:
+    def __init__(self,spiObj:SpiDev = None,serial_dev:Serial = None) -> None:
         # holds the current angles of the motors
         self.current_angles = np.zeros(NUM_PINNAE_MOTORS, dtype=np.int16)
 
@@ -37,24 +37,41 @@ class PinnaeController:
         
         ## for spidev library
         self.using_spi = True
-        self.spi = SpiDev()
-        self.spi.open(spi_bus,spi_select)
+        self.spi = spiObj
         self.spi.mode = 0
         self.spi.max_speed_hz = 25000000 # 25MHz
         
         # if we are using serial (uart)
         self.serial = serial_dev
-        
-        if serial_dev != None:
-            self.using_spi = False
-            logging.debug("Using Serial port instead of SPI")
-        else:
-            logging.debug("Using SPI to send data")
     
-    def set_serial_object(self,serial:Serial)->None:
-        self.serial = serial
-        self.using_spi = True
+            
+        if SpiDev == None and serial_dev == None:
+            raise ValueError("Neither SPI or Serial object was passed!")
+        elif serial_dev != None:
+            logging.debug("Using serial object instead of SPI!")
+    
+    def config_uart(self,serial_str:str)->None:
+        self.serial = Serial(port=serial_str,baudrate=115200)
+        self.using_spi = False
         logging.debug("Using serial dev instead!")
+        
+    def close_uart(self)->None:
+        if self.serial:
+            if self.serial.is_open:
+                self.serial.close()
+                self.serial = None
+        
+    def config_spi(self,bus,ss)->None:
+        """Sets the internal SPI object to this new one
+
+        Args:
+            spiObj (SpiDev): new spi object
+        """
+        self.serial = None
+        self.using_spi = True
+        self.spi = SpiDev(bus,ss)
+        self.mode = 0
+        self.spi.max_speed_hz = 25000000
 
     def send_MCU_angles(self,zero_index = -1) -> None:
         """Sends all 7 of the angles to the Grand Central, 
@@ -101,9 +118,15 @@ class PinnaeController:
         write_data = data_buffer.tolist()
         
         if self.using_spi:
-            self.spi.xfer2(write_data)
+            if self.spi:
+                self.spi.xfer2(write_data)
+            else:
+                logging.error("SPI NOT CONNECTED")
         else:
-            self.serial.write(write_data)
+            if self.serial and self.serial.is_open:
+                self.serial.write(write_data)
+            elif not self.serial:
+                logging.error("ERROR WRITING TO SERIAL!!! CHECK SERIAL")
             
         
         

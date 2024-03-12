@@ -11,7 +11,7 @@ import logging
 import numpy as np
 
 class fake_SpiDev():
-    def __init__(self):
+    def __init__(self,bus,ss):
         """this is a fake init"""
         self.mode = 0
         self.max_speed_hz = 10

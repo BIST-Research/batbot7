@@ -30,10 +30,12 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QButtonGroup,
     QRadioButton,
-    QErrorMessage
+    QErrorMessage,
 
 )
 from PyQt6.QtCore import Qt, QFile, QTextStream, QThread, pyqtSignal,QObject
+from PyQt6.QtSerialPort import QSerialPortInfo
+
 import sys,os
 import serial
 import serial.tools.list_ports
@@ -46,6 +48,7 @@ from scipy import signal
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from datetime import datetime 
+import platform
 
 # showing plots in qt from matlab
 class MplCanvas(FigureCanvasQTAgg):
@@ -62,6 +65,12 @@ logging.basicConfig(level=logging.DEBUG)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) )
 from pinnae import PinnaeController
 
+try:
+    from spidev import SpiDev
+except ImportError:
+    logging.error("pinnae.py:: no spidev found, developing on different os ")
+    from fake_spidev import fake_SpiDev as SpiDev
+
 # frequency of dac and adc
 DAC_ADC_FREQ = 1e6
 
@@ -75,7 +84,8 @@ class Widget(QWidget):
     
     # find your serial port and paste into here
     # pinnae = PinnaeController(serial_dev=serial.Serial("/dev/tty.usbmodem14301",baudrate=115200))
-    pinnae = PinnaeController()
+    
+    pinnae = PinnaeController(SpiDev(0,0))
     
     instructionThread = None
     instructionThreadRunning = False
@@ -130,22 +140,44 @@ class Widget(QWidget):
         
         # -------------------------------------------------------------------
         # communication settings
-        mcu_grid = QGridLayout()
-        mcu_GB = QGroupBox("MCU Protocol")
+        self.mcu_grid = QGridLayout()
+        mcu_GB = QGroupBox("Pinna Protocol")
         
         spi_CB = QCheckBox("SPI")
         spi_CB.setChecked(True)
-        
         uart_CB = QCheckBox("UART")
         
-        self.mcu_protocol_BG = QButtonGroup()
-        self.mcu_protocol_BG.setExclusive(True)
-        self.mcu_protocol_BG.addButton(spi_CB)
-        self.mcu_protocol_BG.addButton(uart_CB)
+        # objects depending on the selected object
+        self.spi_ss_SB = QSpinBox()
+        self.spi_ss_SB.setPrefix("SS: ")
+        self.spi_ss_SB.setValue(0)
+        self.spi_bus_SB = QSpinBox()
+        self.spi_bus_SB.setPrefix("BUS: ")
+        self.spi_bus_SB.setValue(0)
+        # uart config stuff
+        self.uart_search_PB = QPushButton("Search")
+        self.uart_name_CB = QComboBox()
+        self.uart_connect_PB = QPushButton("Connect")
+        # connect their callbacks
+        self.spi_ss_SB.valueChanged.connect(self.mcu_spi_options_pressed)
+        self.spi_bus_SB.valueChanged.connect(self.mcu_spi_options_pressed)
+        self.uart_search_PB.pressed.connect(self.uart_search_PB_pressed)
+        self.uart_connect_PB.pressed.connect(self.uart_connect_PB_pressed)
         
-        mcu_grid.addWidget(spi_CB)
-        mcu_grid.addWidget(uart_CB)
-        mcu_GB.setLayout(mcu_grid)
+        # create button group taht only allows one at a time
+        self.pinna_protocol_BG = QButtonGroup()
+        self.pinna_protocol_BG.setExclusive(True)
+        self.pinna_protocol_BG.addButton(spi_CB,id=1)
+        self.pinna_protocol_BG.addButton(uart_CB,id=2)
+        # attach callback to add settings to it
+        self.pinna_protocol_BG.buttonReleased.connect(self.pinna_protocol_BG_CB)
+        # call the method to initialize
+        self.pinna_protocol_BG_CB()
+        
+        self.mcu_grid.addWidget(spi_CB,0,0)
+        self.mcu_grid.addWidget(uart_CB,1,0)
+        mcu_GB.setLayout(self.mcu_grid)
+        
         
         # -------------------------------------------------------------------
         # settings for chirps
@@ -220,7 +252,7 @@ class Widget(QWidget):
         # put together two groupboxes
         hLay = QHBoxLayout()
         hLay.addWidget(directory_GB)
-        # hLay.addWidget(mcu_GB)
+        hLay.addWidget(mcu_GB)
         hLay.addWidget(chirp_GB)
         
         self.chirp_settings_changed_callback()
@@ -228,7 +260,93 @@ class Widget(QWidget):
         self.experiment_settings_GB.setLayout(hLay)
         self.mainVLay.addWidget(self.experiment_settings_GB)
         
+        
+    def uart_search_PB_pressed(self)->None:
 
+        self.uart_name_CB.clear()
+        available_ports = QSerialPortInfo.availablePorts()
+        if len(available_ports) == 0:
+            return
+        self.uart_connect_PB.setEnabled(True)
+        self.uart_name_CB.setEnabled(True)
+        for port_info in available_ports:
+            self.uart_name_CB.addItem(port_info.portName())
+            
+    
+    def uart_connect_PB_pressed(self)->None:
+        new_serial_str = self.uart_name_CB.currentText()
+        port = new_serial_str
+        if platform.system() == "Darwin":
+            port = "/dev/" +new_serial_str
+        
+        if self.uart_connect_PB.text() == "Disconnect":
+            self.uart_connect_PB.setText("Connect")
+            self.pinnae.close_uart()
+            return
+            
+        try:
+            test = serial.Serial(port,baudrate=115200)
+            test.close()
+            self.pinnae.config_uart(port)
+            logging.debug(f"Using serial: {new_serial_str}")
+            self.uart_connect_PB.setText("Disconnect")
+        except:
+            self.uart_connect_PB.setText("Connect")
+            logging.error(f"FAILED TO CONNECT TO {port}")
+            error_msg = QErrorMessage(self)
+            error_msg.showMessage(f"Serial port: {port} did not work!")
+            
+            
+    
+    def pinna_protocol_BG_CB(self)->None:
+        """When pinna_protocol_BG is pressed this function changes the configuration 
+        settings seen in the gui
+        """
+        button_id = self.pinna_protocol_BG.checkedId()
+        if button_id == 1: # spi
+            self.mcu_grid.addWidget(self.spi_bus_SB,0,1)
+            self.mcu_grid.addWidget(self.spi_ss_SB,1,1)
+            self.spi_bus_SB.setVisible(True)
+            self.spi_ss_SB.setVisible(True)
+            
+            
+            self.mcu_grid.removeWidget(self.uart_name_CB)
+            self.mcu_grid.removeWidget(self.uart_connect_PB)
+            self.mcu_grid.removeWidget(self.uart_search_PB)
+            self.uart_name_CB.setVisible(False)
+            self.uart_connect_PB.setVisible(False)
+            self.uart_search_PB.setVisible(False)
+            self.uart_name_CB.setEnabled(False)
+            self.uart_connect_PB.setEnabled(False)
+            
+            self.mcu_spi_options_pressed()
+            self.pinnae.close_uart()
+            self.uart_connect_PB.setText("Connect")
+        else:   # UART
+            # remove spi stuff
+            self.mcu_grid.removeWidget(self.spi_bus_SB)
+            self.mcu_grid.removeWidget(self.spi_ss_SB)
+            self.spi_bus_SB.setVisible(False)
+            self.spi_ss_SB.setVisible(False)
+            
+            # add uart stuff
+            self.mcu_grid.addWidget(self.uart_search_PB,0,1)
+            self.mcu_grid.addWidget(self.uart_name_CB,1,1)
+            self.mcu_grid.addWidget(self.uart_connect_PB,2,1)
+            self.uart_name_CB.setVisible(True)
+            self.uart_connect_PB.setVisible(True)
+            self.uart_search_PB.setVisible(True)
+            
+        
+    def mcu_spi_options_pressed(self)->None:
+        """When option is pressed in uart or spi config area
+        this calls and sets the values
+        """
+        bus = self.spi_bus_SB.value()
+        ss = self.spi_ss_SB.value()
+        logging.debug(f"SPI settings changed, bus: {bus}, ss: {ss}")
+        self.pinnae.config_spi(bus,ss)
+        
     def get_current_experiment_time(self):
         """Get the current time string that can be used as a file name or folder name"""
         return datetime.now().strftime("experiment_%m-%d-%Y_%H-%M-%S%p")
