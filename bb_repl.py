@@ -29,6 +29,17 @@ import numpy as np
 INT16_MIN = np.iinfo(np.int16).min
 INT16_MAX = np.iinfo(np.int16).max
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 
 class bb_repl(Cmd):
     """BatBot 7's repl interface class
@@ -130,8 +141,42 @@ class bb_repl(Cmd):
                 self.pinnae.set_new_zero_position(index)
             else:
                 self.pinnae.set_motor_angle(index-1,int(arg))
+            
                 
+    def do_config_gps(self,args)->None:
+        pass
+    
+    def do_status(self,args)->None:
+        """Generate workup on microcontroller status's
+        """
+        self.poutput(f"\nBattery Voltage: \t11.2V, \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
+        self.poutput(f"Internal Temp: \t\t72f, \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
+        self.poutput(f"Emit board-UART: {'com2'} \t\tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
+        self.poutput(f"Record board-SPI: bus:1 ss:1,  \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
+        self.poutput(f"Left Pinna-SPI: bus:0 ss:0, \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC} ")
+        self.poutput(f"Right Pinna-SPI: bus:0 ss:1, \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC} ")
+        self.poutput(f"GPS Board-UART: {'com3'} \t\tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
+        self.poutput(f"{bcolors.OKBLUE}\tREADY FOR RUNS{bcolors.ENDC}")
         
+    test_parser = Cmd2ArgumentParser()
+    test_parser.add_argument('-gps',help="test GPS for output",required=False)
+    test_parser.add_argument('-lp', help="test left pinna",required=False)
+    test_parser.add_argument('-rp',help="test right pinna", required=False)
+    test_parser.add_argument('-emit',help="test emit board")
+    test_parser.add_argument('-record',help="test record board")
+    @with_argparser(test_parser)
+    def do_test(self,args)->None:
+        """Tests a specific peripheral or all peripherals
+        """
+        
+        
+        
+    run_parser = Cmd2ArgumentParser()
+    @with_argparser(run_parser)
+    def do_run(self,args)->None:
+        pass
+        
+                
             
 if __name__ == '__main__':
     bb = bb_repl()

@@ -27,6 +27,10 @@ class fake_SpiDev():
         chunked_data[0]= data[0]
 
         # view the bytes being sent
+        """ note the scheme here, index 0 is the motor to reset its zero position, 
+            index 2 is the first half of motor 1 values
+            index 3 is the second half of motor 1 values
+            pattern repeats"""
         for i, item in enumerate(data):
             if i > 0:
                 if i % 2 == 0:

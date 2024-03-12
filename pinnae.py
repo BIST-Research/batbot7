@@ -50,7 +50,11 @@ class PinnaeController:
             logging.debug("Using Serial port instead of SPI")
         else:
             logging.debug("Using SPI to send data")
-        
+    
+    def set_serial_object(self,serial:Serial)->None:
+        self.serial = serial
+        self.using_spi = True
+        logging.debug("Using serial dev instead!")
 
     def send_MCU_angles(self,zero_index = -1) -> None:
         """Sends all 7 of the angles to the Grand Central, 
