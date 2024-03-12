@@ -73,7 +73,8 @@ class Widget(QWidget):
     # main vertical layout everything is added to
     mainVLay = QVBoxLayout()
     
-    
+    # find your serial port and paste into here
+    # pinnae = PinnaeController(serial_dev=serial.Serial("/dev/tty.usbmodem14301",baudrate=115200))
     pinnae = PinnaeController()
     
     instructionThread = None
