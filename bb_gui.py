@@ -276,7 +276,7 @@ class Widget(QWidget):
     def uart_connect_PB_pressed(self)->None:
         new_serial_str = self.uart_name_CB.currentText()
         port = new_serial_str
-        if platform.system() == "Darwin":
+        if platform.system() == "Darwin" or "Linux":
             port = "/dev/" +new_serial_str
         
         if self.uart_connect_PB.text() == "Disconnect":
