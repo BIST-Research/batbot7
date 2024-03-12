@@ -282,6 +282,8 @@ class Widget(QWidget):
         if self.uart_connect_PB.text() == "Disconnect":
             self.uart_connect_PB.setText("Connect")
             self.pinnae.close_uart()
+            self.uart_search_PB.setEnabled(True)
+            self.uart_name_CB.setEnabled(True)
             return
             
         try:
@@ -290,8 +292,12 @@ class Widget(QWidget):
             self.pinnae.config_uart(port)
             logging.debug(f"Using serial: {new_serial_str}")
             self.uart_connect_PB.setText("Disconnect")
+            self.uart_search_PB.setEnabled(False)
+            self.uart_name_CB.setEnabled(False)
         except:
             self.uart_connect_PB.setText("Connect")
+            self.uart_search_PB.setEnabled(True)
+            self.uart_name_CB.setEnabled(True)
             logging.error(f"FAILED TO CONNECT TO {port}")
             error_msg = QErrorMessage(self)
             error_msg.showMessage(f"Serial port: {port} did not work!")
