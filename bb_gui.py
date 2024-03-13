@@ -275,11 +275,14 @@ class Widget(QWidget):
     
     def uart_connect_PB_pressed(self)->None:
         new_serial_str = self.uart_name_CB.currentText()
+        
+        # have to append for linux based systems
         port = new_serial_str
         if platform.system() == "Linux" or "Darwin":
             port = "/dev/" +new_serial_str
             logging.debug(f"On platform: {platform.system()}")
         
+        # if the button is connect then make it disconnect
         if self.uart_connect_PB.text() == "Disconnect":
             self.uart_connect_PB.setText("Connect")
             self.pinnae.close_uart()
