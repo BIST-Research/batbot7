@@ -6,6 +6,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 import argparse
 from serial import Serial
+from enum import Enum
 
 # for developing on not the PI we create fake library
 # that mimics spidev
@@ -22,6 +23,11 @@ NUM_PINNAE_MOTORS = 7
 DEFAULT_MIN_ANGLE_LIMIT = np.int16(-180)
 DEFAULT_MAX_ANGLE_LIMIT = np.int16(180)
 
+class COM_TYPE(Enum):
+    NONE = -1
+    SPI = 1
+    UART = 2
+
 class PinnaeController:
     def __init__(self,spiObj:SpiDev = None,serial_dev:Serial = None) -> None:
         # holds the current angles of the motors
@@ -35,31 +41,36 @@ class PinnaeController:
         self.max_angle_limits = np.zeros(NUM_PINNAE_MOTORS,dtype=np.int16)
         self.max_angle_limits[:] = DEFAULT_MAX_ANGLE_LIMIT
         
-        ## for spidev library
-        self.using_spi = True
-        self.spi = spiObj
-        self.spi.mode = 0
-        self.spi.max_speed_hz = 25000000 # 25MHz
+        self.com_type = COM_TYPE.NONE
         
-        # if we are using serial (uart)
+
+
+        self.spi = spiObj
         self.serial = serial_dev
     
             
-        if SpiDev == None and serial_dev == None:
-            raise ValueError("Neither SPI or Serial object was passed!")
+        if spiObj != None:
+            self.com_type = COM_TYPE.SPI
+            self.spi.mode = 0
+            self.spi.max_speed_hz = 25000000
         elif serial_dev != None:
-            logging.debug("Using serial object instead of SPI!")
+            self.com_type = COM_TYPE.UART
+            logging.debug("Using Serial object")
+        else:
+            self.com_type = COM_TYPE.NONE
+            raise ValueError("NEITHER SPI OR SERIAL WAS PASSED")
     
     def config_uart(self,serial_str:str)->None:
         self.serial = Serial(port=serial_str,baudrate=115200)
-        self.using_spi = False
-        logging.debug("Using serial dev instead!")
+        self.com_type = COM_TYPE.UART
+        logging.debug("Using UART NOW!")
         
     def close_uart(self)->None:
         if self.serial:
             if self.serial.is_open:
                 self.serial.close()
                 self.serial = None
+                self.com_type = COM_TYPE.NONE
         
     def config_spi(self,bus,ss)->None:
         """Sets the internal SPI object to this new one
@@ -68,7 +79,7 @@ class PinnaeController:
             spiObj (SpiDev): new spi object
         """
         self.serial = None
-        self.using_spi = True
+        self.com_type = COM_TYPE.SPI
         self.spi = SpiDev(bus,ss)
         self.mode = 0
         self.spi.max_speed_hz = 25000000
@@ -117,16 +128,31 @@ class PinnaeController:
         # convert the data to list so we can send it
         write_data = data_buffer.tolist()
         
-        if self.using_spi:
+        # if self.using_spi:
+        #     if self.spi:
+        #         self.spi.xfer2(write_data)
+        #     else:
+        #         logging.error("SPI NOT CONNECTED")
+        # else:
+        #     if self.serial and self.serial.is_open:
+        #         self.serial.write(write_data)
+        #     elif not self.serial:
+        #         logging.error("ERROR WRITING TO SERIAL!!! CHECK SERIAL")
+        
+        if self.com_type == COM_TYPE.SPI:
             if self.spi:
                 self.spi.xfer2(write_data)
             else:
-                logging.error("SPI NOT CONNECTED")
-        else:
+                logging.error("SPI NOT CONNECTED!")
+                self.com_type = COM_TYPE.NONE
+        elif self.COM_TYPE == COM_TYPE.UART:
             if self.serial and self.serial.is_open:
                 self.serial.write(write_data)
-            elif not self.serial:
-                logging.error("ERROR WRITING TO SERIAL!!! CHECK SERIAL")
+            else:
+                logging.error("UART NOT CONNECTED!")
+                self.com_type == COM_TYPE.NONE
+        else:
+            logging.error("NO COM TYPE SELECTED CHOOSE UART OR SPI!")
             
         
         
