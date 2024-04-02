@@ -11,16 +11,18 @@ import os
     
 class EchoListener:
     
-    def __init__(self,serial_obj:Serial,channel_burst_len:np.uint16 = 1000, left_channel_first = True,sample_freq:int = 1e6) -> None:
+    def __init__(self,serial_obj:Serial = Serial(),channel_burst_len:np.uint16 = 1000, left_channel_first = True,sample_freq:int = 1e6) -> None:
         """Create echo listener using the serial device 
 
         Args:
             serial_obj (Serial): object of teensy
             channel_burst_len (np.uint16): length of left and right channel bursts. Defaults to 1000 uint16's.
         """
+        
         self.teensy = serial_obj
-        self.teensy.baudrate = 480e6    # set the max speed!
-        self.teensy.timeout = 0.1
+        if serial_obj:
+            self.teensy.baudrate = 480e6    # set the max speed!
+            self.teensy.timeout = 0.2
         
         self.read_chunk_size = 1024     # 
         
@@ -33,15 +35,26 @@ class EchoListener:
         self.left_channel_first = left_channel_first
     
     def check_status(self)->bool:
-        self.teensy.flush()
-        self.teensy.write(b'0')
+        if not self.teensy:
+            return False
+
+        if not self.teensy.is_open:
+            self.teensy.open()
+        else:
+            self.teensy.close()
+            self.teensy.open()
         self.teensy.write(b'A')
-        
+   
         
         if self.teensy.read().decode() == 'A':
             return True
         
         return False
+    
+    def connect_Serial(self,serial:Serial):
+        self.teensy = serial
+        self.teensy.baudrate = 480e6
+        self.teensy.timeout = 0.3
         
     def listen(self, listen_time_ms:np.uint16)->tuple[np.uint16,np.uint16,np.uint16]:
         """Reads bytes from Teensy for given amount of listen time. This listen time
@@ -67,11 +80,14 @@ class EchoListener:
         read_times = int(samples_to_read/self.channel_burst_len)
 
             
-        raw_bytes = bytearray()        
+        raw_bytes = bytearray()
+        self.teensy.flush()      
         self.teensy.write(b'1')
         for i in range(read_times):
             raw_bytes.extend(self.teensy.read(self.channel_burst_len*2))
         self.teensy.write(b'0')
+        self.teensy.close()
+        
             
         raw_data = np.frombuffer(raw_bytes,dtype=np.uint16)
 

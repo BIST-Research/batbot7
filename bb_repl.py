@@ -25,11 +25,19 @@ import argparse
 import struct
 import pinnae
 import numpy as np
+import bb_listener
+import yaml
+import serial
+import bb_gps
+import matplotlib.pylab as plt
+import logging
+logging.basicConfig(level=logging.WARNING)
+
 
 INT16_MIN = np.iinfo(np.int16).min
 INT16_MAX = np.iinfo(np.int16).max
 
-class bcolors:
+class t_colors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'
@@ -45,15 +53,40 @@ class bb_repl(Cmd):
     """BatBot 7's repl interface class
     """
     
-    pinnae = pinnae.PinnaeController()
+
     
-    def __init__(self):
+    def __init__(self,yaml_cfg_file:str = 'bb_conf.yaml'):
         
         self.prompt='(batbot)>> '
-        super().__init__()
-    
+        self.yaml_cfg_file = yaml_cfg_file
 
-    def do_battery(self, _:Statement) ->None: 
+        self.record_MCU = bb_listener.EchoListener()
+        self.emit_MCU = serial.Serial()
+        self.L_pinna_MCU = pinnae.PinnaeController()
+        self.R_pinna_MCU = pinnae.PinnaeController()
+        self.gps_MCU = bb_gps.bb_gps2()
+        
+        
+        super().__init__()
+        self._startup()
+        
+
+    
+    def _startup(self):
+        
+        
+        with open(self.yaml_cfg_file, "r") as f:
+            # Load YAML data
+            self.bb_config = yaml.safe_load(f)
+        
+        self.poutput(f"{t_colors.WARNING}Checking system...{t_colors.ENDC}")
+    
+            
+        
+        self.do_status(None)
+        
+                
+    def do_batt(self, _:Statement) ->None: 
         """Returns the battery status of batbot
         """
         self.poutput('11.7v')
@@ -63,106 +96,10 @@ class bb_repl(Cmd):
         """
         self.poutput('73f OK')
         
-    #--------------------------------------------------------------------------
-    # chirp
-    chirp_parser = Cmd2ArgumentParser()
-    chirp_parser.add_argument('-r','--repeat', type=int,help='chirp [n] times')
-    @with_argparser(chirp_parser)    
-    def do_chirp(self, args)->None:
-        """Tells the chirp MCU to chirp
 
-        """
-        repetitions = args.repeat or 1
-        
-        for _ in range(repetitions):
-            self.poutput('chirp..')
-    
-    
-    def do_generate_chirp(self,args)->None:
+    def do_gen_chirp(self,args)->None:
         pass
     
-    #--------------------------------------------------------------------------
-    # def check_arg_index_type(arg):
-    #     error_msg = "Invalid motor index, must be 1-7 or 'all'"
-    #     try:
-    #         value = int(arg)
-    #         if 1<= value <= 7:
-    #             return value
-    #         else:
-    #             raise argparse.ArgumentTypeError(error_msg)
-    #     except ValueError:
-    #         if arg.lower() == 'all':
-    #             return arg.lower()
-    #         else:
-    #             raise argparse.ArgumentTypeError(error_msg)
-            
-    # def check_arg_arg_type(arg):
-    #     error_msg = "Invalid angle, must be int16 number, 'max' or 'min'"
-    #     try:
-    #         value = int(arg)
-    #         if INT16_MIN <= value <= INT16_MAX:
-    #             return value
-    #         else:
-    #             raise argparse.ArgumentTypeError(error_msg)
-    #     except ValueError:
-    #         if arg.lower() == 'min' or 'max' or 'zero':
-    #             return arg.lower()
-    #         else:
-    #             raise argparse.ArgumentTypeError(error_msg)
-        
-    # pinnae control
-    # pinna_parser = Cmd2ArgumentParser()
-    # pinna_parser.add_argument('index', type=check_arg_index_type, help='Use all or value 1-7 to control motor')
-    # pinna_parser.add_argument('arg',type=check_arg_arg_type,
-    #                            help='arg={angle,zero}. angle: use int16 value, max, min. To set zero: zero')
-    # @with_argparser(pinna_parser)
-    # def do_pinna(self,args)->None:
-    #     """Control the pinna
-
-    #     """
-    #     index = args.index
-    #     arg = args.arg
-    #     self.poutput(f"\tSetting motor {index} to {arg}")
-        
-    #     if index == 'all':
-    #         if arg == 'max':
-    #             self.pinnae.set_motors_to_max()
-    #         elif arg == 'min':
-    #             self.pinnae.set_motors_to_min()
-    #         elif arg == 'zero':
-    #             self.pinnae.set_all_new_zero_position()
-    #         else:
-    #             angles = [int(arg)]*7
-    #             self.pinnae.set_motor_angles(angles)
-                
-    #     else:
-    #         if arg == 'max':
-    #             self.pinnae.set_motor_to_max(index)
-    #         elif arg == 'min':
-    #             self.pinnae.set_motor_to_min(index)
-    #         elif arg =='zero':
-    #             self.pinnae.set_new_zero_position(index)
-    #         else:
-                # self.pinnae.set_motor_angle(index-1,int(arg))
-    pinna_parser = Cmd2ArgumentParser()
-    pinna_parser.add_argument('-cf','--config',action='store_true',required=False)
-    @with_argparser(pinna_parser)
-    def do_pinna(self,args)->None:
-        
-        if args.config:
-            self.poutput(f"{bcolors.OKGREEN}Configuring Serial or SPI{bcolors.ENDC}")
-            using_spi = False
-            self.poutput("Enter for configuration")
-            
-            while True:
-                input = self.prompt("1: Serial \n2:SPI")
-                if input == "quit":
-                    return
-                elif input == "1":
-                    self.poutput("")
-                    pass
-                elif input == "2":
-                    pass
             
                 
     def do_config_gps(self,args)->None:
@@ -171,33 +108,149 @@ class bb_repl(Cmd):
     def do_status(self,args)->None:
         """Generate workup on microcontroller status's
         """
-        self.poutput(f"\nBattery Voltage: \t11.2V, \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
-        self.poutput(f"Internal Temp: \t\t72f, \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
-        self.poutput(f"Emit board-UART: {'com2'} \t\tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
-        self.poutput(f"Record board-SPI: bus:1 ss:1,  \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
-        self.poutput(f"Left Pinna-SPI: bus:0 ss:0, \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC} ")
-        self.poutput(f"Right Pinna-SPI: bus:0 ss:1, \tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC} ")
-        self.poutput(f"GPS Board-UART: {'com3'} \t\tstatus:  {bcolors.OKGREEN}OK {bcolors.ENDC}")
-        self.poutput(f"{bcolors.OKBLUE}\tREADY FOR RUNS{bcolors.ENDC}")
+        self.poutput(f"\nBattery:\t\tNA, \t\t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+        self.poutput(f"Body Temp:\t\tNA, \t\t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
         
-    test_parser = Cmd2ArgumentParser()
-    test_parser.add_argument('--gps',help="test GPS for output",action='store_true')
-    test_parser.add_argument('--lp', help="test left pinna",action='store_true')
-    test_parser.add_argument('--rp',help="test right pinna", action='store_true')
-    test_parser.add_argument('--emit',help="test emit board",action='store_true')
-    test_parser.add_argument('--record',help="test record board",action='store_true')
-    @with_argparser(test_parser)
-    def do_test(self,args)->None:
-        """Tests a specific peripheral or all peripherals
+        try:
+            if not self.emit_MCU.is_open:
+                self.emit_MCU.port = self.bb_config['emit_MCU']
+            self.emit_MCU.write(b'A')
+            self.poutput(f"Emit MCU-UART: \t\t'{self.bb_config['emit_MCU']}' \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+        except:
+            self.poutput(f"Emit MCU-UART: \t\t'{self.bb_config['emit_MCU']}' \t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+
+        try:
+            if not self.record_MCU.teensy.is_open:
+                self.record_MCU.connect_Serial(serial.Serial(self.bb_config['record_MCU']))
+            if not self.record_MCU.check_status():
+                raise ValueError
+            self.poutput(f"Record MCU-UART: \t'{self.bb_config['record_MCU']}'  \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+        except:
+            self.poutput(f"Record MCU-UART: \t'{self.bb_config['record_MCU']}'  \t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+        
+        try:
+            if not self.gps_MCU.serial.is_open:
+                self.gps_MCU.connect_Serial(serial.Serial(self.bb_config['gps_MCU']))
+            self.poutput(f"GPS MCU-UART: {self.bb_config['gps_MCU']} \t\t\t\t{t_colors.OKGREEN}OK{t_colors.ENDC}")
+        except:
+            self.poutput(f"GPS MCU-UART:\t\t'{self.bb_config['gps_MCU']}'\t\t\t {t_colors.FAIL} FAIL{t_colors.ENDC}")
+        
+        bus = self.bb_config['left_pinnae_MCU']['bus']
+        ss = self.bb_config['left_pinnae_MCU']['ss']
+        try:
+            if self.L_pinna_MCU.com_type == pinnae.COM_TYPE.NONE:
+                self.L_pinna_MCU.config_spi(bus,ss)
+            
+            if not self.L_pinna_MCU.get_ack():
+                raise
+            self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
+        except:
+            self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
+
+        bus = self.bb_config['right_pinnae_MCU']['bus']
+        ss = self.bb_config['right_pinnae_MCU']['ss']
+        try:
+            if self.R_pinna_MCU.com_type == pinnae.COM_TYPE.NONE:
+                self.R_pinna_MCU.config_spi(bus,ss)
+            
+            if not self.R_pinna_MCU.get_ack():
+                raise
+            self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
+        except:
+            self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
+            
+        
+        
+        self.poutput(f"{t_colors.OKBLUE}\tREADY FOR RUNS{t_colors.ENDC}")
+        
+        
+    listen_parser = Cmd2ArgumentParser()
+    listen_parser.add_argument('listen_time_ms',type=int,help="Time to listen for in ms")
+    listen_parser.add_argument('-p','--plot',action='store_true',help="Plot the results")
+    listen_parser.add_argument('-fft','--fft',action='store_true',help="Plot the fft")
+    @with_argparser(listen_parser)
+    def do_listen(self,args):
+        """Listen for echos 
+
+        Args:
+            args (_type_): _description_
         """
-        pass
+        # if not self.record_MCU.check_status():
+        #     self.poutput(f"{t_colors.FAIL}Record MCU not responding! {t_colors.ENDC}")
         
+        _,L,R = self.record_MCU.listen(args.listen_time_ms)
         
-        
-    run_parser = Cmd2ArgumentParser()
-    @with_argparser(run_parser)
-    def do_run(self,args)->None:
-        pass
+        if args.plot and args.fft:
+            Fs = self.record_MCU.sample_freq
+            T = 1/Fs
+            x_vals = np.linspace(0,len(L)/Fs,num=len(L))
+            plt.figure()
+            plt.subplot(2,2,1)
+            plt.plot(x_vals,L)
+            plt.xlabel("Time")
+            plt.subplot(2,2,2)
+            plt.plot(x_vals,R)
+            plt.xlabel("Time")   
+
+            N = len(L)
+            X = np.fft.fft(L)
+            freqs = np.fft.fftfreq(N,d=T)
+            plt.subplot(2,2,3)
+            plt.plot(freqs, np.abs(X),linewidth=1)
+            plt.title('FFT')
+            plt.xlabel('Frequency [Hz]')
+            plt.ylabel('Magnitude')
+            plt.xlim(0, Fs/2 )  # Display only positive frequencies
+   
+            X = np.fft.fft(R)
+            plt.subplot(2,2,4)
+            plt.plot(freqs, np.abs(X),linewidth=1)
+            plt.title('FFT')
+            plt.xlabel('Frequency [Hz]')
+            plt.ylabel('Magnitude')
+            plt.xlim(0, Fs/2 )  # Display only positive frequencies
+            plt.tight_layout()
+            plt.show()    
+            plt.close()   
+        elif args.plot:
+            Fs = self.record_MCU.sample_freq
+            T = 1/Fs
+            x_vals = np.linspace(0,len(L)/Fs,num=len(L))
+            plt.figure()
+            plt.subplot(1,2,1)
+            plt.plot(x_vals,L)
+            plt.xlabel("Time")
+            plt.subplot(1,2,2)
+            plt.plot(x_vals,R)
+            plt.xlabel("Time")   
+            plt.show()
+            plt.close()
+            
+        elif args.fft:
+            # do fft
+            plt.figure()
+            Fs  = self.record_MCU.sample_freq
+            T = 1/Fs
+            N = len(L)
+            X = np.fft.fft(L)
+            freqs = np.fft.fftfreq(N,d=T)
+            plt.subplot(1,2,1)
+            plt.plot(freqs, np.abs(X),linewidth=1)
+            plt.title('FFT')
+            plt.xlabel('Frequency [Hz]')
+            plt.ylabel('Magnitude')
+            plt.xlim(0, Fs/2 )  # Display only positive frequencies
+   
+            X = np.fft.fft(R)
+            plt.subplot(1,2,2)
+            plt.plot(freqs, np.abs(X),linewidth=1)
+            plt.title('FFT')
+            plt.xlabel('Frequency [Hz]')
+            plt.ylabel('Magnitude')
+            plt.xlim(0, Fs/2 )  # Display only positive frequencies
+            # plt.tight_layout()
+            plt.show()    
+            plt.close()
         
                 
             

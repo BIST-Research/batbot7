@@ -1,0 +1,18 @@
+# Teensy 4.1 serial
+record_MCU: '/dev/tty.usbmodem136132801'
+
+# ItsyBitsy serial
+emit_MCU:   '/dev/tty.usbmodem132801'
+
+# Grand Central SPI def
+left_pinnae_MCU:
+  bus: 0
+  ss: 0
+
+# Grand Central SPI def
+right_pinnae_MCU:
+  bus: 0
+  ss: 1
+
+# gps serial address
+gps_MCU: '/dev/tty.usbmodem234'

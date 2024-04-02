@@ -25,7 +25,8 @@ DEFAULT_MAX_ANGLE_LIMIT = np.int16(180)
 
 class COM_TYPE(Enum):
     NONE = -1
-    SPI = 1
+    SPI = 0
+    FAKE_SPI = 1
     UART = 2
 
 class PinnaeController:
@@ -53,12 +54,12 @@ class PinnaeController:
             self.com_type = COM_TYPE.SPI
             self.spi.mode = 0
             self.spi.max_speed_hz = 25000000
+            logging.debug("Using SPI object")
         elif serial_dev != None:
             self.com_type = COM_TYPE.UART
             logging.debug("Using Serial object")
         else:
             self.com_type = COM_TYPE.NONE
-            raise ValueError("NEITHER SPI OR SERIAL WAS PASSED")
     
     def config_uart(self,serial_str:str)->None:
         self.serial = Serial(port=serial_str,baudrate=115200)
@@ -72,7 +73,7 @@ class PinnaeController:
                 self.serial = None
                 self.com_type = COM_TYPE.NONE
         
-    def config_spi(self,bus,ss)->None:
+    def config_spi(self,spi:SpiDev)->None:
         """Sets the internal SPI object to this new one
 
         Args:
@@ -80,9 +81,12 @@ class PinnaeController:
         """
         self.serial = None
         self.com_type = COM_TYPE.SPI
-        self.spi = SpiDev(bus,ss)
-        self.mode = 0
+        self.spi = spi
+        self.spi.mode = 0
         self.spi.max_speed_hz = 25000000
+        
+    def get_ack(self)->bool:
+        return False
 
     def send_MCU_angles(self,zero_index = -1) -> None:
         """Sends all 7 of the angles to the Grand Central, 

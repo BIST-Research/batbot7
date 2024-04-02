@@ -35,7 +35,7 @@ from pygnssutils import GNSSNTRIPClient, VERBOSITY_DEBUG,VERBOSITY_HIGH,VERBOSIT
     
     
 class bb_gps2():
-    def __init__(self, serial: Serial,
+    def __init__(self, serial: Serial = Serial(),
                  ntripuser:str=None,
                  mountpoint:str="VTTI_SR_RTCM3",
                  ntripserver:str="RTK2go.com",
@@ -67,6 +67,9 @@ class bb_gps2():
 
         self.run_filename = "unset"
     
+    def connect_Serial(self,serial:Serial):
+        self.serial = serial
+        
     
     def run(self, file_name: str, dir = None):
         
