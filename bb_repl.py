@@ -26,11 +26,13 @@ import struct
 import pinnae
 import numpy as np
 import bb_listener
+import bb_emitter
 import yaml
 import serial
 import bb_gps
 import matplotlib.pylab as plt
 import logging
+import serial.tools.list_ports
 logging.basicConfig(level=logging.WARNING)
 
 
@@ -60,8 +62,8 @@ class bb_repl(Cmd):
         self.prompt='(batbot)>> '
         self.yaml_cfg_file = yaml_cfg_file
 
-        self.record_MCU = bb_listener.EchoListener()
-        self.emit_MCU = serial.Serial()
+        self.record_MCU = bb_listener.EchoRecorder()
+        self.emit_MCU = bb_emitter.EchoEmitter()
         self.L_pinna_MCU = pinnae.PinnaeController()
         self.R_pinna_MCU = pinnae.PinnaeController()
         self.gps_MCU = bb_gps.bb_gps2()
@@ -84,7 +86,8 @@ class bb_repl(Cmd):
             
         
         self.do_status(None)
-        
+        self.do_config('')
+        exit
                 
     def do_batt(self, _:Statement) ->None: 
         """Returns the battery status of batbot
@@ -100,10 +103,26 @@ class bb_repl(Cmd):
     def do_gen_chirp(self,args)->None:
         pass
     
+    config_parser = Cmd2ArgumentParser()
+    config_parser.add_argument('-e','--emit_MCU',action='store_true',help="config emit board")
+    config_parser.add_argument('-r','--record_MCU',action='store_true',help="config record board")
+    config_parser.add_argument('-lp','--left_pinna',action='store_true',help='config left pinna')
+    config_parser.add_argument('-rp','--right_pinna',action='store_true',help='config right pinna')
+    config_parser.add_argument('-g','--gps',action='store_true',help='config gps com')
+    @with_argparser(config_parser)
+    def do_config(self,args):
+
+        
+
+        # Get a list of available serial ports
+        ports = serial.tools.list_ports.comports()
+    
+        for i,port in enumerate(ports):
+            self.poutput(f"{i}. {port.device}")
+            
+        self.poutput(f"select port")
             
                 
-    def do_config_gps(self,args)->None:
-        pass
     
     def do_status(self,args)->None:
         """Generate workup on microcontroller status's
@@ -111,29 +130,41 @@ class bb_repl(Cmd):
         self.poutput(f"\nBattery:\t\tNA, \t\t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
         self.poutput(f"Body Temp:\t\tNA, \t\t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
         
+        port = self.bb_config['emit_MCU']['port']
         try:
-            if not self.emit_MCU.is_open:
-                self.emit_MCU.port = self.bb_config['emit_MCU']
-            self.emit_MCU.write(b'A')
-            self.poutput(f"Emit MCU-UART: \t\t'{self.bb_config['emit_MCU']}' \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+            if not self.emit_MCU.connection_status():
+                self.emit_MCU.connect_Serial(serial.Serial(port))
+            if not self.emit_MCU.connection_status():
+                raise
+                
+            self.poutput(f"Emit MCU-UART: \t\tport:{port} \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:
-            self.poutput(f"Emit MCU-UART: \t\t'{self.bb_config['emit_MCU']}' \t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+            self.poutput(f"Emit MCU-UART: \t\tport:{port} \t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
 
+
+        port = self.bb_config['record_MCU']['port']
         try:
-            if not self.record_MCU.teensy.is_open:
-                self.record_MCU.connect_Serial(serial.Serial(self.bb_config['record_MCU']))
-            if not self.record_MCU.check_status():
-                raise ValueError
-            self.poutput(f"Record MCU-UART: \t'{self.bb_config['record_MCU']}'  \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+            if not self.record_MCU.connection_status():
+                self.record_MCU.connect_Serial(serial.Serial(port))
+            if not self.record_MCU.connection_status():
+                raise
+                
+            self.poutput(f"Record MCU-UART:\tport:{port} \t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:
-            self.poutput(f"Record MCU-UART: \t'{self.bb_config['record_MCU']}'  \t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+            self.poutput(f"Record MCU-UART:\tport:{port} \t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+     
+     
+        port = self.bb_config['gps_MCU']['port']
+        try:
+            if not self.gps_MCU.connection_status():
+                self.gps_MCU.connect_Serial(serial.Serial(port))
+            if not self.gps_MCU.connection_status():
+                raise
+                
+            self.poutput(f"GPS MCU-UART:\t\tport:{port} \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+        except:
+            self.poutput(f"GPS MCU-UART:\t\tport:{port} \t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
         
-        try:
-            if not self.gps_MCU.serial.is_open:
-                self.gps_MCU.connect_Serial(serial.Serial(self.bb_config['gps_MCU']))
-            self.poutput(f"GPS MCU-UART: {self.bb_config['gps_MCU']} \t\t\t\t{t_colors.OKGREEN}OK{t_colors.ENDC}")
-        except:
-            self.poutput(f"GPS MCU-UART:\t\t'{self.bb_config['gps_MCU']}'\t\t\t {t_colors.FAIL} FAIL{t_colors.ENDC}")
         
         bus = self.bb_config['left_pinnae_MCU']['bus']
         ss = self.bb_config['left_pinnae_MCU']['ss']
@@ -160,10 +191,12 @@ class bb_repl(Cmd):
             self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
             
         
+        self.poutput(f"{t_colors.FAIL}\t LIMITED CAPABILITIES{t_colors.ENDC}")
         
-        self.poutput(f"{t_colors.OKBLUE}\tREADY FOR RUNS{t_colors.ENDC}")
         
         
+
+    
     listen_parser = Cmd2ArgumentParser()
     listen_parser.add_argument('listen_time_ms',type=int,help="Time to listen for in ms")
     listen_parser.add_argument('-p','--plot',action='store_true',help="Plot the results")
@@ -194,6 +227,9 @@ class bb_repl(Cmd):
 
             N = len(L)
             X = np.fft.fft(L)
+            # Set x-axis ticks and labels in kHz
+            plt.xticks(np.arange(0, 10001, 1000), [f'{freq/1000:.0f} kHz' for freq in np.arange(0, 10001, 1000)])
+
             freqs = np.fft.fftfreq(N,d=T)
             plt.subplot(2,2,3)
             plt.plot(freqs, np.abs(X),linewidth=1)

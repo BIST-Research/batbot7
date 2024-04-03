@@ -9,7 +9,7 @@ import os
 
 
     
-class EchoListener:
+class EchoRecorder:
     
     def __init__(self,serial_obj:Serial = Serial(),channel_burst_len:np.uint16 = 1000, left_channel_first = True,sample_freq:int = 1e6) -> None:
         """Create echo listener using the serial device 
@@ -55,6 +55,9 @@ class EchoListener:
         self.teensy = serial
         self.teensy.baudrate = 480e6
         self.teensy.timeout = 0.3
+    
+    def connection_status(self)->bool:
+        return self.teensy.is_open
         
     def listen(self, listen_time_ms:np.uint16)->tuple[np.uint16,np.uint16,np.uint16]:
         """Reads bytes from Teensy for given amount of listen time. This listen time

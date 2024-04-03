@@ -72,6 +72,17 @@ class PinnaeController:
                 self.serial.close()
                 self.serial = None
                 self.com_type = COM_TYPE.NONE
+                
+    def connection_status(self)->bool:
+        if self.com_type == COM_TYPE.NONE:
+            return False
+        
+        elif self.com_type == COM_TYPE.FAKE_SPI:
+            return False
+        elif self.com_type == COM_TYPE.SPI:
+            return True
+        elif self.com_type == COM_TYPE.UART:
+            return self.serial.is_open
         
     def config_spi(self,spi:SpiDev)->None:
         """Sets the internal SPI object to this new one

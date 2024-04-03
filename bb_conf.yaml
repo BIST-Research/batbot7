@@ -1,18 +1,30 @@
 # Teensy 4.1 serial
-record_MCU: '/dev/tty.usbmodem136132801'
+record_MCU: 
+  type: 'UART'
+  port: '/dev/tty.usbmodem136132801'
+  baud: 480e6
 
 # ItsyBitsy serial
-emit_MCU:   '/dev/tty.usbmodem132801'
+emit_MCU:   
+  type: 'UART'
+  port: '/dev/tty.usbmodem132801'
+  baud: 115200
 
 # Grand Central SPI def
 left_pinnae_MCU:
+  type: 'SPI'
   bus: 0
   ss: 0
 
 # Grand Central SPI def
 right_pinnae_MCU:
+  type: 'SPI'
   bus: 0
   ss: 1
 
 # gps serial address
-gps_MCU: '/dev/tty.usbmodem234'
+gps_MCU: 
+  type: 'UART'
+  port: '/dev/tty.usbmodem234'
+  baud: 115200
+  rate: 1 # rate to send coordinates at

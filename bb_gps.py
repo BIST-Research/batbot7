@@ -70,6 +70,9 @@ class bb_gps2():
     def connect_Serial(self,serial:Serial):
         self.serial = serial
         
+    def connection_status(self)->bool:
+        return self.serial.is_open
+        
     
     def run(self, file_name: str, dir = None):
         
