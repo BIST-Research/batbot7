@@ -219,16 +219,16 @@ class bb_repl(Cmd):
             x_vals = np.linspace(0,len(L)/Fs,num=len(L))
             plt.figure()
             plt.subplot(2,2,1)
-            plt.plot(x_vals,L)
+            plt.plot(x_vals,L,'o-',markersize=0.2)
             plt.xlabel("Time")
             plt.subplot(2,2,2)
-            plt.plot(x_vals,R)
+            plt.plot(x_vals,R,markersize=0.2)
             plt.xlabel("Time")   
 
             N = len(L)
             X = np.fft.fft(L)
             # Set x-axis ticks and labels in kHz
-            plt.xticks(np.arange(0, 10001, 1000), [f'{freq/1000:.0f} kHz' for freq in np.arange(0, 10001, 1000)])
+            # plt.xticks(np.arange(0, 10001, 1000), [f'{freq/1000:.0f} kHz' for freq in np.arange(0, 10001, 1000)])
 
             freqs = np.fft.fftfreq(N,d=T)
             plt.subplot(2,2,3)
