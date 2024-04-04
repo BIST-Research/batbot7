@@ -34,7 +34,7 @@ import matplotlib.pylab as plt
 import logging
 import serial.tools.list_ports
 logging.basicConfig(level=logging.WARNING)
-
+plt.set_loglevel("error")
 
 INT16_MIN = np.iinfo(np.int16).min
 INT16_MAX = np.iinfo(np.int16).max
@@ -131,11 +131,11 @@ class bb_repl(Cmd):
         self.poutput(f"Body Temp:\t\tNA, \t\t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
         
         port = self.bb_config['emit_MCU']['port']
+        baud = self.bb_config['emit_MCU']['baud']
         try:
             if not self.emit_MCU.connection_status():
-                self.emit_MCU.connect_Serial(serial.Serial(port))
-            if not self.emit_MCU.connection_status():
-                raise
+                self.emit_MCU.connect_Serial(serial.Serial(port,baudrate=baud))
+
                 
             self.poutput(f"Emit MCU-UART: \t\tport:{port} \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:
@@ -143,11 +143,12 @@ class bb_repl(Cmd):
 
 
         port = self.bb_config['record_MCU']['port']
+        baud = self.bb_config['record_MCU']['baud']
         try:
             if not self.record_MCU.connection_status():
-                self.record_MCU.connect_Serial(serial.Serial(port))
-            if not self.record_MCU.connection_status():
-                raise
+                self.record_MCU.connect_Serial(serial.Serial(port,baudrate=baud))
+            # if not self.record_MCU.connection_status():
+            #     raise
                 
             self.poutput(f"Record MCU-UART:\tport:{port} \t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:
@@ -211,6 +212,7 @@ class bb_repl(Cmd):
         # if not self.record_MCU.check_status():
         #     self.poutput(f"{t_colors.FAIL}Record MCU not responding! {t_colors.ENDC}")
         
+        self.emit_MCU.write_cmd(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP)
         _,L,R = self.record_MCU.listen(args.listen_time_ms)
         
         if args.plot and args.fft:
@@ -287,8 +289,52 @@ class bb_repl(Cmd):
             # plt.tight_layout()
             plt.show()    
             plt.close()
+            
+
+    upload_sine_parser = Cmd2ArgumentParser()
+    upload_sine_parser.add_argument('-f','--freq',help='frequency to gen, > 1Hz only, use xk',required=True,type=str)
+    upload_sine_parser.add_argument('-t','--time',help='Time in ms to chirp, max is 60ms',type=int,default=30)
+    upload_sine_parser.add_argument('-p','--plot',help='Preview',action='store_true')
+    @with_argparser(upload_sine_parser)
+    def do_upload_sine(self,args):
+        if args.time < 0 or args.time > 60:
+            self.perror("-t must be [0,60]!")
+            return
+        freqstr = args.freq.lower()
+        val = freqstr.split('k')
+        if not val[0].isdigit():
+            self.perror(f"-f {freqstr} is not valid, use xk")
+            return
         
-                
+        if freqstr.endswith('k'):
+            freq = int(val[0])*1e3
+        else:
+            freq = int(val[0])
+        
+        [s,t] = self.emit_MCU.gen_sine(args.time,freq)
+        
+        if args.plot:
+            plt.figure()
+            plt.plot(t,s,'o-',linewidth=0.4,markersize=0.4)
+            plt.show()
+            plt.close()
+        
+        val = input(f"Sure you want to upload? y/n: ")
+        
+        while True:
+            if val.lower() == 'y':
+                break
+            elif val.lower() == 'n':
+                return
+            val = input(f"y/n: ")
+            
+        self.emit_MCU.upload_chirp(data=s)
+    
+    
+        
+    def do_chirp(self,args):
+        # self.emit_MCU.chirp()
+        self.emit_MCU.write_cmd(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP)
             
 if __name__ == '__main__':
     bb = bb_repl()

@@ -2,13 +2,13 @@
 record_MCU: 
   type: 'UART'
   port: '/dev/tty.usbmodem136132801'
-  baud: 480e6
+  baud: 480000
 
 # ItsyBitsy serial
 emit_MCU:   
   type: 'UART'
-  port: '/dev/tty.usbmodem132801'
-  baud: 115200
+  port: '/dev/tty.usbmodem14101'
+  baud: 960000
 
 # Grand Central SPI def
 left_pinnae_MCU:
