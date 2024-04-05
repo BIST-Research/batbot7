@@ -422,14 +422,12 @@ class bb_repl(Cmd):
     upload_sine_parser.add_argument('-t','--time',help='Time in ms to chirp, max is 60ms',type=int,default=30)
     upload_sine_parser.add_argument('-p','--plot',help='Preview',action='store_true')
     upload_sine_parser.add_argument('-fft','--fft',help='fft plot',action='store_true')
+    upload_sine_parser.add_argument('-g','--gain',help='typical gain',type=int,default=2040)
     @with_argparser(upload_sine_parser)
     def do_upload_sine(self,args):
-        if args.time < 0 or args.time > 60:
-            self.perror("-t must be [0,60]!")
-            return
         freq = convert_khz(args.freq)
         
-        [s,t] = self.emit_MCU.gen_sine(args.time,freq)
+        [s,t] = self.emit_MCU.gen_sine(args.time,freq,args.gain)
         
         if args.plot and args.fft:
             plt.figure()
@@ -477,19 +475,20 @@ class bb_repl(Cmd):
     upload_chirp_parser.add_argument('-f0','--freq0',help='start freq',required=True,type=str)
     upload_chirp_parser.add_argument('-f1','--freq1',help='end freq',required=True,type=str)
     upload_chirp_parser.add_argument('-t','--time',help='Time in ms to chirp, max is 60ms',type=int,default=30)
+    upload_chirp_parser.add_argument('-g','--gain',help='gain to boost signal for DAC',type=int,default=2040)
     upload_chirp_parser.add_argument('-m','--method',help='linear, quadratic..',type=str,default='linear')
     upload_chirp_parser.add_argument('-p','--plot',help='Preview',action='store_true')
     upload_chirp_parser.add_argument('-fft','--fft',help='Preview',action='store_true')
     @with_argparser(upload_chirp_parser)
     def do_upload_chirp(self,args):
-        if args.time < 0 or args.time > 60:
-            self.perror("-t must be [0,60]!")
-            return
-
         freq0 = convert_khz(args.freq0)
+        if freq0 is None:
+            self.perror("-f0 should be xk")
         freq1 = convert_khz(args.freq1)
+        if freq1 is None:
+            self.perror("-f1 should be xk")
 
-        [s,t] = self.emit_MCU.gen_chirp(freq0,freq1,args.time,args.method)
+        [s,t] = self.emit_MCU.gen_chirp(freq0,freq1,args.time,args.method,args.gain)
 
         if args.plot and args.fft:
             plt.figure()

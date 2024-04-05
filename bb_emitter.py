@@ -9,6 +9,8 @@ import struct
 import matplotlib.pyplot as plt
 import sys
 from scipy import signal
+import zlib
+
 
 
 class ECHO_SERIAL_CMD(Enum):
@@ -31,6 +33,8 @@ def hide_cursor():
 def show_cursor():
     sys.stdout.write("\033[?25h")  # Show cursor
     sys.stdout.flush()
+
+
 
 class t_colors:
     HEADER = '\033[95m'
@@ -157,11 +161,12 @@ class EchoEmitter:
         data_len = len(data)
         
         if data_len > self.max_chirp_length:
-            print(f"{t_colors.FAIL}DATA TOO LONG! {data_len} max is {self.max_chirp_length}{t_colors.ENDC}")
+            print(f"{t_colors.FAIL}DATA TOO LONG! given: {data_len} but max is {self.max_chirp_length} or {self.max_chirp_length*1e-3}ms!{t_colors.ENDC}")
             return False
 
         
-        
+        OG_CRC = zlib.crc32(data)
+
         write_data = data.tolist()
         for data in write_data:
             copy_write.append(data &0xff)
@@ -187,15 +192,25 @@ class EchoEmitter:
             
         # upload the chirp
         hide_cursor()
-        for i in range(0,len(copy_write),2):
-            self.itsy.write([copy_write[i],copy_write[i+1]])
+        for i in range(0,len(copy_write),20):
+            self.itsy.write([copy_write[i],copy_write[i+1],
+                             copy_write[i+2],copy_write[i+3],
+                             copy_write[i+4],copy_write[i+5],
+                             copy_write[i+6],copy_write[i+7],
+                             copy_write[i+8],copy_write[i+9],
+                             copy_write[i+10],copy_write[i+11],
+                             copy_write[i+12],copy_write[i+13],
+                             copy_write[i+14],copy_write[i+15],
+                             copy_write[i+16],copy_write[i+17],
+                             copy_write[i+18],copy_write[i+19]])
             
-            if i % 50 == 0:
+            if i % 20 == 0:
                 print(f"{t_colors.OKBLUE}Uploading{t_colors.ENDC}: {i/len(copy_write)*100:.1f}%",end='\r',flush=True)
         print(f"{t_colors.OKBLUE}Uploading{t_colors.ENDC}: {100:.1f}%",end='\r',flush=True)
         print()            
         show_cursor()
                 
+
         # wait for an ack from itsy to say they got it
         self.write_cmd(ECHO_SERIAL_CMD.ACK_REQ)
         msg_recv = self.get_cmd()
@@ -205,18 +220,12 @@ class EchoEmitter:
             return
         
         # verify the chirp by reading it back
-        print("Validating data..")
-        hide_cursor()
-        return_data = bytearray()
-        for i in range(int(data_len/2)):
-            return_data.extend(self.itsy.read(4))
-            if i % 50 == 0:
-                print(f"{t_colors.OKBLUE}Reading{t_colors.ENDC}: {i*2/data_len*100:.1f}%",end='\r',flush=True)
-        print(f"{t_colors.OKBLUE}Reading{t_colors.ENDC}: {100:.1f}%",end='\r',flush=True)
-        print()
-        show_cursor()
+        print("Validating data.. HASH OK")
+        crc_back = self.itsy.read(4)
+        crc_back = (crc_back[0] | (crc_back[1]<<8) | (crc_back[2] << 16) | (crc_back[3] << 24))
 
-        if return_data == copy_write:
+
+        if crc_back == OG_CRC:
             print(f"{t_colors.OKGREEN}SUCCESS, UPLOADED CHIRP!{t_colors.ENDC}")
         else:
             print(f"{t_colors.FAIL}FAILED TO UPLOAD CHIRP{t_colors.ENDC}")
@@ -257,26 +266,26 @@ class EchoEmitter:
         pass
     
     
-    def gen_chirp(self,f_start:int,f_end:int, t_end:int,method:str ='linear')->tuple[np.uint16,np.ndarray]:
-        if t_end > 60:
-            print(f"{t_colors.FAIL}time {time} too large!{t_colors.ENDC}")
-            return
+    def gen_chirp(self,f_start:int,f_end:int, t_end:int,method:str ='linear',gain:np.uint16 = 2040)->tuple[np.uint16,np.ndarray]:
+        # if t_end > 60:
+        #     print(f"{t_colors.FAIL}time {t_end} too large!{t_colors.ENDC}")
+        #     return
         
         Fs = 1e6
         Ts = 1/Fs
         t = np.arange(0,t_end*1e-3 - Ts/2,Ts)
         chirp = signal.chirp(t,f_start,t_end*1e-3,f_end,method)
         chirp = chirp + 1
-        chirp = chirp*2040
+        chirp = chirp*gain
 
         chirp = chirp.astype(np.uint16)
 
         return [chirp,t]
     
-    def gen_sine(self,time_ms:np.uint16, freq:np.uint16)->tuple[np.uint16,np.ndarray]:
-        if time_ms > 60:
-            print(f"{t_colors.FAIL}time {time} too large!{t_colors.ENDC}")
-            return
+    def gen_sine(self,time_ms:np.uint16, freq:np.uint16,gain:np.uint16 = 2040)->tuple[np.uint16,np.ndarray]:
+        # if time_ms > 60:
+        #     print(f"{t_colors.FAIL}time {time} too large!{t_colors.ENDC}")
+        #     return
         
         DATA_LEN = int(time_ms*1e3)
         duration = DATA_LEN / 1e6  # Duration of the sine wave (in seconds)
@@ -284,13 +293,13 @@ class EchoEmitter:
         t = np.linspace(0, duration, DATA_LEN, endpoint=False)
         
         sin_wave = 1 + np.sin(2 * np.pi * freq *t)
-        sin_wave = sin_wave*2040
+        sin_wave = sin_wave*gain
         sin_wave = sin_wave.astype(np.uint16)
         
         return [sin_wave,t]
 
 if __name__ == '__main__':
-    emitter = EchoEmitter(Serial('COM5',baudrate=960000))
+    emitter = EchoEmitter(Serial('/dev/tty.usbmodem14101',baudrate=960000))
 
     DATA_LEN = 30000
     
@@ -311,14 +320,14 @@ if __name__ == '__main__':
     # sin_wave,t = emitter.gen_sine(40,30e3)
     sin_wave, t = emitter.gen_chirp(90e3,40e3,30)
 
-    plt.figure()
-    plt.plot(t,sin_wave,'o-')
+    # plt.figure()
+    # plt.plot(t,sin_wave,'o-')
 
-    plt.show()
+    # plt.show()
 
     print(f"len {len(t)} len {len(sin_wave)}")
 
-    # emitter.upload_chirp(sin_wave)
+    emitter.upload_chirp(sin_wave)
 
     # emitter.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)
     # emitter.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)
