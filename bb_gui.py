@@ -361,7 +361,7 @@ class Widget(QWidget):
         bus = self.spi_bus_SB.value()
         ss = self.spi_ss_SB.value()
         logging.debug(f"SPI settings changed, bus: {bus}, ss: {ss}")
-        self.pinnae.config_spi(bus,ss)
+        self.pinnae.config_spi(SpiDev(bus,ss))
         
     def get_current_experiment_time(self):
         """Get the current time string that can be used as a file name or folder name"""

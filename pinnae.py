@@ -142,17 +142,7 @@ class PinnaeController:
         
         # convert the data to list so we can send it
         write_data = data_buffer.tolist()
-        
-        # if self.using_spi:
-        #     if self.spi:
-        #         self.spi.xfer2(write_data)
-        #     else:
-        #         logging.error("SPI NOT CONNECTED")
-        # else:
-        #     if self.serial and self.serial.is_open:
-        #         self.serial.write(write_data)
-        #     elif not self.serial:
-        #         logging.error("ERROR WRITING TO SERIAL!!! CHECK SERIAL")
+    
         
         if self.com_type == COM_TYPE.SPI:
             if self.spi:
@@ -160,7 +150,7 @@ class PinnaeController:
             else:
                 logging.error("SPI NOT CONNECTED!")
                 self.com_type = COM_TYPE.NONE
-        elif self.COM_TYPE == COM_TYPE.UART:
+        elif self.com_type == COM_TYPE.UART:
             if self.serial and self.serial.is_open:
                 self.serial.write(write_data)
             else:
