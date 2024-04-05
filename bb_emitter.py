@@ -7,7 +7,8 @@ import os
 from enum import Enum
 import struct
 import matplotlib.pyplot as plt
-# plt.set_loglevel("error")
+import sys
+from scipy import signal
 
 
 class ECHO_SERIAL_CMD(Enum):
@@ -22,6 +23,25 @@ class ECHO_SERIAL_CMD(Enum):
     START_AMP = 8
     STOP_AMP = 9
     CLEAR_SERIAL = 10
+
+def hide_cursor():
+    sys.stdout.write("\033[?25l")  # Hide cursor
+    sys.stdout.flush()
+
+def show_cursor():
+    sys.stdout.write("\033[?25h")  # Show cursor
+    sys.stdout.flush()
+
+class t_colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 
 class EchoEmitter:
@@ -48,7 +68,7 @@ class EchoEmitter:
         
     def connection_status(self,print_:bool = False) ->bool:
         if not self.itsy.is_open:
-            if print_: print("EMIT NO SERIAL!") 
+            if print_: print(f"{t_colors.FAIL}EMIT NO SERIAL!{t_colors.ENDC}") 
             try:
                 if self.itsy.portstr != None:
                     self.itsy.open()
@@ -65,7 +85,7 @@ class EchoEmitter:
         back_val = self.get_cmd()
 
         if back_val == ECHO_SERIAL_CMD.ACK:
-            if print_: print("EMIT CONNECTED!")
+            if print_: print(f"{t_colors.OKCYAN}EMIT CONNECTED!{t_colors.ENDC}")
             return True
         
 
@@ -108,23 +128,22 @@ class EchoEmitter:
         elif cmd == ECHO_SERIAL_CMD.STOP_AMP.value:
             return ECHO_SERIAL_CMD.STOP_AMP
         
-        print(f"UNKNOWN CMD {cmd}")
+        print(f"{t_colors.FAIL}UNKNOWN CMD {cmd}{t_colors.ENDC}")
         return ECHO_SERIAL_CMD.ERROR
 
     def chirp(self) -> bool:
         if not self.connection_status():
             return False
         if False == self.chirp_uploaded:
-            print("WARNING NO CHRIP UPLOADED, PRECEEDING ANYWAY!")
+            print(f"{t_colors.WARNING}WARNING NO CHRIP UPLOADED, PRECEEDING ANYWAY!{t_colors.ENDC}")
             
         self.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)
         msg = self.get_cmd()
         if msg != ECHO_SERIAL_CMD.ACK:
-            print(f"FAILED TO CHIRP? {msg}")
+            print(f"{t_colors.FAIL}FAILED TO CHIRP {msg}{t_colors.ENDC}")
             return False
 
-    def upload_chirp(self,data:np.uint16 = None, file:str = None)->bool:
-        print("UPLOAD CHIRP")
+    def upload_chirp(self,data:np.uint16 = None, file:str = None,verify:bool = True)->bool:
         self.itsy.flush()
         if not self.connection_status():
             
@@ -138,7 +157,7 @@ class EchoEmitter:
         data_len = len(data)
         
         if data_len > self.max_chirp_length:
-            print(f"DATA TOO LONG! {data_len} max is {self.max_chirp_length}")
+            print(f"{t_colors.FAIL}DATA TOO LONG! {data_len} max is {self.max_chirp_length}{t_colors.ENDC}")
             return False
 
         
@@ -148,19 +167,16 @@ class EchoEmitter:
             copy_write.append(data &0xff)
             copy_write.append((data>>8)&0xff)
         
-        # self.write_cmd(ECHO_SERIAL_CMD.CHIRP_DATA)
         self.itsy.write([ECHO_SERIAL_CMD.CHIRP_DATA.value,data_len&0xff,data_len>>8&0xff])
         
     
         data = self.itsy.read(2)
         data = data[0] | data[1]<<8
         if data != data_len:
-            print(f"ERROR RETURNED DIFF LENGTHS {data}")
+            print(f"{t_colors.FAIL}ERROR RETURNED DIFF LENGTHS {data}{t_colors.ENDC}")
             msg_recv = self.get_cmd()
             print(f"returned {msg_recv}")
             return False
-        else:
-            print(f"GOT GOOD LEN BACK")
 
             
         msg_recv = self.get_cmd()
@@ -168,37 +184,41 @@ class EchoEmitter:
             print(f"ERROR WAITING FOR ACK GOT {msg_recv}")
             self.chirp_uploaded = False
             return False
-        else:
-            print(f"GOT LENGTH ACK")
             
-
         
-        
-        ack_count = 0
-        # for i,data in enumerate(copy_write):
+        hide_cursor()
         for i in range(0,len(copy_write),2):
             self.itsy.write([copy_write[i],copy_write[i+1]])
-                        
+            
+            if i % 20 == 0:
+                print(f"{t_colors.OKBLUE}Uploading{t_colors.ENDC}: {i/len(copy_write)*100:.1f}%",end='\r',flush=True)
+        print(f"{t_colors.OKBLUE}Uploading{t_colors.ENDC}: {100:.1f}%",end='\r',flush=True)
+        print()            
+        show_cursor()
                 
         
         self.write_cmd(ECHO_SERIAL_CMD.ACK_REQ)
         msg_recv = self.get_cmd()
         if msg_recv != ECHO_SERIAL_CMD.ACK:
-            print(f"EXPECTED ACK {msg_recv}")
+            print(f"{t_colors.FAIL}EXPECTED ACK {msg_recv}{t_colors.ENDC}")
             self.chirp_uploaded = False
             return
-        else:
-            print(f"GOT ACK")
         
+        print("Validating data..")
+        hide_cursor()
         return_data = bytearray()
-        for i in range(data_len):
-            return_data.extend(self.itsy.read(2))
-            
-        print(f"Got {len(return_data)} and sent {len(copy_write)}")
+        for i in range(int(data_len/2)):
+            return_data.extend(self.itsy.read(4))
+            if i % 20 == 0:
+                print(f"{t_colors.OKBLUE}Reading{t_colors.ENDC}: {i*2/data_len*100:.1f}%",end='\r',flush=True)
+        print(f"{t_colors.OKBLUE}Reading{t_colors.ENDC}: {100:.1f}%",end='\r',flush=True)
+        print()
+        show_cursor()
+
         if return_data == copy_write:
-            print(f"SUCCESS UPLOADED CHIRP")
+            print(f"{t_colors.OKGREEN}SUCCESS, UPLOADED CHIRP!{t_colors.ENDC}")
         else:
-            print(f"FAILED TO UPLOAD CHIRP")
+            print(f"{t_colors.FAIL}FAILED TO UPLOAD CHIRP{t_colors.ENDC}")
             self.chirp_uploaded = False
             return False
         
@@ -236,12 +256,21 @@ class EchoEmitter:
         pass
     
     
-    def gen_chirp(selff_start:int,f_end:int, t_end:int,method:str ='linear')->np.uint16:
-        pass
+    def gen_chirp(self,f_start:int,f_end:int, t_end:int,method:str ='linear')->tuple[np.uint16,np.ndarray]:
+        if t_end > 60:
+            print(f"{t_colors.FAIL}time {time} too large!{t_colors.ENDC}")
+            return
+        
+        Fs = 1e6
+        Ts = 1/Fs
+        t = np.arange(0,t_end*1e-3 - Ts/2,Ts)
+        chirp = signal.chirp(t,f_start,t_end*1e-3,f_end,method)
+
+        return chirp,t
     
     def gen_sine(self,time_ms:np.uint16, freq:np.uint16)->tuple[np.uint16,np.ndarray]:
         if time_ms > 60:
-            print(f"time {time} too large!")
+            print(f"{t_colors.FAIL}time {time} too large!{t_colors.ENDC}")
             return
         
         DATA_LEN = int(time_ms*1e3)

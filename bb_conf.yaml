@@ -3,28 +3,41 @@ record_MCU:
   type: 'UART'
   port: '/dev/tty.usbmodem136132801'
   baud: 480000
+  serial_num: '13613280'
+  use: serial_num
 
 # ItsyBitsy serial
 emit_MCU:   
   type: 'UART'
   port: '/dev/tty.usbmodem14101'
   baud: 960000
+  serial_num: '4D39AB9A5351523450202020FF11334F'
+  use: serial_num
+
 
 # Grand Central SPI def
 left_pinnae_MCU:
   type: 'SPI'
   bus: 0
   ss: 0
+  serial_num: 'nill'
+  max_angle: [180, 180, 180, 180, 180,180,180]
+
 
 # Grand Central SPI def
 right_pinnae_MCU:
   type: 'SPI'
   bus: 0
   ss: 1
+  serial_num: 'nill'
+  max_angle: [180, 180, 180, 180, 180,180,180]
 
 # gps serial address
 gps_MCU: 
   type: 'UART'
   port: '/dev/tty.usbmodem234'
   baud: 115200
+  serial_num: 'null'
+  use: port
   rate: 1 # rate to send coordinates at
+

@@ -160,7 +160,8 @@ class PinnaeController:
             logging.error("NO COM TYPE SELECTED CHOOSE UART OR SPI!")
             
         
-        
+    def calibrate_and_get_motor_limits(self)->np.int16:
+        pass 
 
 
     def set_motor_limit(self,motor_index: np.uint8, min: np.int16, max: np.int16)-> bool:
@@ -387,6 +388,8 @@ class PinnaeController:
         self.send_MCU_angles()
         logging.debug("Setting all motors to zero")
         return True
+    
+
     # --------------------------------------------------------------------------------------
     #           Functions for moving the motors
 
