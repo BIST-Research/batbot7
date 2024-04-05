@@ -185,18 +185,18 @@ class EchoEmitter:
             self.chirp_uploaded = False
             return False
             
-        
+        # upload the chirp
         hide_cursor()
         for i in range(0,len(copy_write),2):
             self.itsy.write([copy_write[i],copy_write[i+1]])
             
-            if i % 20 == 0:
+            if i % 50 == 0:
                 print(f"{t_colors.OKBLUE}Uploading{t_colors.ENDC}: {i/len(copy_write)*100:.1f}%",end='\r',flush=True)
         print(f"{t_colors.OKBLUE}Uploading{t_colors.ENDC}: {100:.1f}%",end='\r',flush=True)
         print()            
         show_cursor()
                 
-        
+        # wait for an ack from itsy to say they got it
         self.write_cmd(ECHO_SERIAL_CMD.ACK_REQ)
         msg_recv = self.get_cmd()
         if msg_recv != ECHO_SERIAL_CMD.ACK:
@@ -204,12 +204,13 @@ class EchoEmitter:
             self.chirp_uploaded = False
             return
         
+        # verify the chirp by reading it back
         print("Validating data..")
         hide_cursor()
         return_data = bytearray()
         for i in range(int(data_len/2)):
             return_data.extend(self.itsy.read(4))
-            if i % 20 == 0:
+            if i % 50 == 0:
                 print(f"{t_colors.OKBLUE}Reading{t_colors.ENDC}: {i*2/data_len*100:.1f}%",end='\r',flush=True)
         print(f"{t_colors.OKBLUE}Reading{t_colors.ENDC}: {100:.1f}%",end='\r',flush=True)
         print()
@@ -265,8 +266,12 @@ class EchoEmitter:
         Ts = 1/Fs
         t = np.arange(0,t_end*1e-3 - Ts/2,Ts)
         chirp = signal.chirp(t,f_start,t_end*1e-3,f_end,method)
+        chirp = chirp + 1
+        chirp = chirp*2040
 
-        return chirp,t
+        chirp = chirp.astype(np.uint16)
+
+        return [chirp,t]
     
     def gen_sine(self,time_ms:np.uint16, freq:np.uint16)->tuple[np.uint16,np.ndarray]:
         if time_ms > 60:
@@ -279,13 +284,13 @@ class EchoEmitter:
         t = np.linspace(0, duration, DATA_LEN, endpoint=False)
         
         sin_wave = 1 + np.sin(2 * np.pi * freq *t)
-        sin_wave = sin_wave*2000
+        sin_wave = sin_wave*2040
         sin_wave = sin_wave.astype(np.uint16)
         
         return [sin_wave,t]
 
 if __name__ == '__main__':
-    emitter = EchoEmitter(Serial('/dev/tty.usbmodem14101',baudrate=960000))
+    emitter = EchoEmitter(Serial('COM5',baudrate=960000))
 
     DATA_LEN = 30000
     
@@ -303,7 +308,8 @@ if __name__ == '__main__':
     # sin_wave = sin_wave*2000
     # sin_wave = sin_wave.astype(np.uint16)
     
-    sin_wave,t = emitter.gen_sine(40,30e3)
+    # sin_wave,t = emitter.gen_sine(40,30e3)
+    sin_wave, t = emitter.gen_chirp(90e3,40e3,30)
 
     plt.figure()
     plt.plot(t,sin_wave,'o-')
@@ -312,7 +318,7 @@ if __name__ == '__main__':
 
     print(f"len {len(t)} len {len(sin_wave)}")
 
-    emitter.upload_chirp(sin_wave)
+    # emitter.upload_chirp(sin_wave)
 
     # emitter.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)
     # emitter.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)

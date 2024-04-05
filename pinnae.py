@@ -434,10 +434,15 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QSpinBox,
     QGridLayout,
-    QErrorMessage
+    QErrorMessage,
+    QMenu,
+    QTableWidget,
+    QFileDialog
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 import sys
+import qdarkstyle
 
 
 class PinnaWidget(QWidget):
@@ -449,12 +454,47 @@ class PinnaWidget(QWidget):
         self.pinnae = l_pinna
         
         self.setWindowTitle("Tendon Controller")
-        self.add_controls()
+        self.setWindowIcon(QIcon('HBAT.jpg'))
+        self.add_settings_box()
+        self.add_motor_controls()
+        self.add_table()
+        self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
         
         self.setLayout(self.main_v_layout)
+
+    def add_settings_box(self):
+        grid_lay = QGridLayout()
+
+        self.read_limits_PB = QPushButton("Query Limits")
+        grid_lay.addWidget(self.read_limits_PB,0,0)
+
+        self.calibrate_limits = QPushButton("Calibrate Motors")
+        grid_lay.addWidget(self.calibrate_limits,1,0)
+
+        self.load_file = QPushButton("Load File")
+        self.load_file.clicked.connect(self.load_file_CB)
+        grid_lay.addWidget(self.load_file,0,1)
+
+        self.create_file = QPushButton("Create File")
+        self.create_file.clicked.connect(self.create_file_CB)
+        grid_lay.addWidget(self.create_file,1,1)
+
+        # grid_lay.addWidget(QLabel("Motion File:"),0,2)
+        # self.file_name = QLineEdit()
+        # grid_lay.addWidget(self.file_name,0,3)
+
+
+        self.main_v_layout.addLayout(grid_lay)
         
-    def add_controls(self):
-        self.pinnae_controls_GB = QGroupBox("Controls")
+    def load_file_CB(self):
+        file_path,_ = QFileDialog.getOpenFileName(self,'Load File')
+        
+    def create_file_CB(self):
+        file_path, _ = QFileDialog.getSaveFileName(self,'Save File')
+
+
+    def add_motor_controls(self):
+ 
         
         control_h_lay = QHBoxLayout()
         
@@ -595,7 +635,41 @@ class PinnaWidget(QWidget):
         
         # attach callbacks for controller tendon api
         self.add_motor_control_CB()
+
+    def add_table(self):
+        hlay = QHBoxLayout()
+        self.instruction_T = QTableWidget(1,NUM_PINNAE_MOTORS+1)
+        hlay.addWidget(self.instruction_T)
+        self.instruction_T.setHorizontalHeaderLabels(["M1","M2","M3","M4","M5","M6","M7","Time"])
         
+        #-------------------------------------------------
+        buttonGB = QGroupBox("Settings")
+        vlay = QVBoxLayout()
+
+        self.run_angles_PB = QPushButton("Run")
+        vlay.addWidget(self.run_angles_PB)
+
+        self.step_back_PB = QPushButton("Step Backward")
+        vlay.addWidget(self.step_back_PB)
+
+        self.step_forward_PB = QPushButton("Step Forward")
+        vlay.addWidget(self.step_forward_PB)
+
+        self.new_row_PB = QPushButton("+ Row")
+        vlay.addWidget(self.new_row_PB)
+
+        self.delete_row_PB = QPushButton("- Row")
+        vlay.addWidget(self.delete_row_PB)
+
+        self.paste_angles_PB = QPushButton("Paste Current Angles")
+        vlay.addWidget(self.paste_angles_PB)
+
+
+        buttonGB.setLayout(vlay)
+        #-------------------------------------------------
+        hlay.addWidget(buttonGB)
+
+        self.main_v_layout.addLayout(hlay)
         
     def add_motor_control_CB(self):
         """Connects the motor tendons sliders to the api"""
@@ -633,6 +707,35 @@ class PinnaWidget(QWidget):
         # adjust the slider and spinbox range
         for i in range(NUM_PINNAE_MOTORS):
             self.motor_max_limit_changed_CB(i)
+
+
+    def motor_GB_contextMenu(self,position,index) -> None:
+        """Create menu for each motor box to reduce the number of buttons
+
+        Args:
+            position (int): passed from qt, position on context menu
+            index (int): which motor box this is coming from
+        """
+        assert index < NUM_PINNAE_MOTORS, f"{index} is greater than number of pinnaes!"
+        context_menu = QMenu()
+        context_menu.addMenu(f"Motor {index+1}:")
+        
+        set_zero = context_menu.addAction("Set Zero")
+        max_value = context_menu.addAction("Max")
+        min_value = context_menu.addAction("Min")
+        calibrate = context_menu.addAction("Calibrate Zero")
+        
+        action = context_menu.exec(self.motor_GB[index].mapToGlobal(position))
+        
+        if action == set_zero:
+            self.motor_set_zero_PB_callback(index)
+        elif action == max_value:
+            self.motor_max_PB_pressed(index)
+        elif action == min_value:
+            self.motor_min_PB_pressed(index)
+        elif action == calibrate:
+            pass
+
         
     def motor_max_PB_pressed(self,index):
         """Sets the current motor to its max value

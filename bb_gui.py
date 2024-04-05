@@ -43,12 +43,17 @@ import time
 import math
 import matplotlib
 import matplotlib.pyplot as plt
+plt.set_loglevel("error")
 import numpy as np
 from scipy import signal
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from datetime import datetime 
 import platform
+import qdarkstyle
+
+import bb_listener
+import bb_emitter
 
 # showing plots in qt from matlab
 class MplCanvas(FigureCanvasQTAgg):
@@ -76,7 +81,7 @@ DAC_ADC_FREQ = 1e6
 
 NUM_PINNAE = 7
 
-class Widget(QWidget):
+class BBGUI(QWidget):
     """GUI for controlling Bat Bot"""
     
     # main vertical layout everything is added to
@@ -91,7 +96,7 @@ class Widget(QWidget):
     instructionThreadRunning = False
 
 
-    def __init__(self):
+    def __init__(self,emitter:bb_emitter = None,listener:bb_listener=None, l_pinna:PinnaeController=None, r_pinna:PinnaeController=None):
         """Adds all the widgets to GUI"""
         QWidget.__init__(self)
         self.setWindowTitle("Bat Bot 7 GUI")
@@ -105,6 +110,7 @@ class Widget(QWidget):
         # add pinnae controls layout
         self.Add_Pinnae_Control_GB()
 
+        self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
         
         self.setLayout(self.mainVLay)
         
@@ -1064,6 +1070,6 @@ class RunInstructionsThread(QThread):
 
 if __name__ == "__main__":
     app = QApplication([])
-    widget = Widget()
+    widget = BBGUI()
     widget.show()
     sys.exit(app.exec())

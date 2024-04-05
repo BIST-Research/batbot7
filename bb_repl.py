@@ -34,6 +34,8 @@ import matplotlib.pylab as plt
 import logging
 import serial.tools.list_ports
 from PyQt6.QtWidgets import QApplication, QWidget
+import threading
+import bb_gui
 
 logging.basicConfig(level=logging.WARNING)
 plt.set_loglevel("error")
@@ -100,10 +102,12 @@ class bb_repl(Cmd):
 
         self.record_MCU = bb_listener.EchoRecorder()
         self.emit_MCU = bb_emitter.EchoEmitter()
-        self.L_pinna_MCU = pinnae.PinnaeController()
-        self.R_pinna_MCU = pinnae.PinnaeController()
+        self.L_pinna_MCU = pinnae.PinnaeController(pinnae.SpiDev(0,0))
+        self.R_pinna_MCU = pinnae.PinnaeController(pinnae.SpiDev(0,1))
         self.gps_MCU = bb_gps.bb_gps2()
         
+        self.gui = None
+        self.PinnaWidget = None
         
         super().__init__()
         self._startup()
@@ -134,21 +138,35 @@ class bb_repl(Cmd):
         """Returns the temperature of the batbot
         """
         self.poutput('73f OK')
+
+    def do_gui(self,args):
+        self.app = QApplication.instance()
+        if self.app is None:
+            self.app = QApplication([])
+        if not self.gui or self.gui is None:
+            self.gui = bb_gui.BBGUI(self.emit_MCU,self.record_MCU,self.L_pinna_MCU,self.R_pinna_MCU)
+        self.gui.show()
+        self.app.exec()
+
     
     pinna_parser = Cmd2ArgumentParser()
     pinna_parser.add_argument('-g','--gui',action='store_true')
     @with_argparser(pinna_parser)
     def do_pinna(self,args):
         if args.gui:
-            self.app = QApplication.instance()  # Try to get the existing instance of QApplication
-            if self.app is None:  # Create a new QApplication if it doesn't exist
+            self.app = QApplication.instance()
+            if self.app is None:
                 self.app = QApplication([])
-            widget = pinnae.PinnaWidget(self.L_pinna_MCU,self.R_pinna_MCU)
-            widget.show()
 
+            if self.PinnaWidget is None:
+                self.PinnaWidget = pinnae.PinnaWidget(self.L_pinna_MCU, self.R_pinna_MCU)
+
+            self.PinnaWidget.show()
             self.app.exec()
             
-        
+
+
+
 
     
     config_parser = Cmd2ArgumentParser()
@@ -235,6 +253,7 @@ class bb_repl(Cmd):
             user_input =self.read_input("y/n: ")
                 
     
+
     def do_status(self,args)->None:
         """Generate workup on microcontroller status's
         """
@@ -245,6 +264,8 @@ class bb_repl(Cmd):
         sn = self.bb_config['emit_MCU']['serial_num']
         port = get_serial_port_from_serial_number(sn)
         try:
+            if port is None:
+                raise
             if not self.emit_MCU.connection_status():
                 self.emit_MCU.connect_Serial(serial.Serial(port,baudrate=baud))
                 
@@ -257,6 +278,8 @@ class bb_repl(Cmd):
         sn = self.bb_config['record_MCU']['serial_num']
         port = get_serial_port_from_serial_number(sn)
         try:
+            if port is None:
+                raise
             if not self.record_MCU.connection_status():
                 self.record_MCU.connect_Serial(serial.Serial(port,baudrate=baud))
                 
