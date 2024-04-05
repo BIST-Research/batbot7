@@ -33,6 +33,8 @@ import bb_gps
 import matplotlib.pylab as plt
 import logging
 import serial.tools.list_ports
+from PyQt6.QtWidgets import QApplication, QWidget
+
 logging.basicConfig(level=logging.WARNING)
 plt.set_loglevel("error")
 
@@ -132,13 +134,22 @@ class bb_repl(Cmd):
         """Returns the temperature of the batbot
         """
         self.poutput('73f OK')
+    
+    pinna_parser = Cmd2ArgumentParser()
+    pinna_parser.add_argument('-g','--gui',action='store_true')
+    @with_argparser(pinna_parser)
+    def do_pinna(self,args):
+        if args.gui:
+            self.app = QApplication.instance()  # Try to get the existing instance of QApplication
+            if self.app is None:  # Create a new QApplication if it doesn't exist
+                self.app = QApplication([])
+            widget = pinnae.PinnaWidget(self.L_pinna_MCU,self.R_pinna_MCU)
+            widget.show()
+
+            self.app.exec()
+            
         
 
-    upload_chirp = Cmd2ArgumentParser()
-    upload_chirp.add_argument('-f0','-start_freq',type=int,help='starting freq')
-    upload_chirp.add_argument('-f1','-end_freq',type=int,help='ending freq')
-    def do_gen_chirp(self,args)->None:
-        pass
     
     config_parser = Cmd2ArgumentParser()
     config_parser.add_argument('-e','--emit_MCU',action='store_true',help="config emit board")
