@@ -9,10 +9,19 @@
 #include <ml_eic.h>
 #include <ml_tc_common.h>
 #include <ml_tc2.h>
+#include <CRC32.h>
 
 // 2**15
-#define EMIT_BUF_LEN 40000
+#define EMIT_BUF_LEN 65000
 
+
+uint32_t calcHashCRC32(uint16_t* array, size_t length){
+  CRC32 crc;
+  for (size_t i = 0; i < length; i++){
+    crc.update(array[i]);
+  }
+  return crc.finalize();
+}
 
 
 
@@ -29,7 +38,7 @@ static DmacDescriptor base_descriptor[1] __attribute__((aligned(16)));
 static volatile DmacDescriptor wb_descriptor[1] __attribute__((aligned(16)));
 
 // D4 --> PA14
-const ml_pin_settings dac_timer_pin = {PORT_GRP_A, 14, PF_F, PP_EVEN, OUTPUT_PULL_DOWN, DRIVE_ON};
+const ml_pin_settings dac_sample_timer_pin = {PORT_GRP_A, 21, PF_G, PP_ODD, OUTPUT_PULL_DOWN, DRIVE_OFF};
 // D10 --> PA20
 const ml_pin_settings amp_pin = {PORT_GRP_A, 20, PF_A, PP_EVEN, OUTPUT_PULL_DOWN, DRIVE_ON};
 // A0 --> PA02
@@ -40,14 +49,14 @@ const ml_pin_settings emit_trigger_pin = {PORT_GRP_A, 16, PF_A, PP_EVEN, INPUT_P
 #define AMP_DISABLE() (logical_set(&amp_pin))
 #define AMP_ENABLE() (logical_unset(&amp_pin))
 
-const uint32_t chirp_out_dmac_channel_settings = DMAC_CHCTRLA_BURSTLEN_SINGLE | // check when testing evsys
+const uint32_t chirp_out_dmac_channel_settings = DMAC_CHCTRLA_BURSTLEN_SINGLE | //check when testing evsys
                                                  DMAC_CHCTRLA_TRIGACT_BURST |
-                                                 // DMAC_CHCTRLA_TRIGSRC(DAC_DMAC_ID_EMPTY_0);
+                                                 //DMAC_CHCTRLA_TRIGSRC(DAC_DMAC_ID_EMPTY_0);
                                                  DMAC_CHCTRLA_TRIGSRC(TCC0_DMAC_ID_OVF);
 
 const uint16_t chirp_out_dmac_descriptor_settings = DMAC_BTCTRL_VALID |
-                                                    //         DMAC_BTCTRL_EVOSEL_BURST | //check when testing evsys
-                                                    DMAC_BTCTRL_BLOCKACT_BOTH | // check when testing evsys
+                                           //         DMAC_BTCTRL_EVOSEL_BURST | //check when testing evsys
+                                                    DMAC_BTCTRL_BLOCKACT_BOTH | //check when testing evsys
                                                     DMAC_BTCTRL_BEATSIZE_HWORD |
                                                     DMAC_BTCTRL_SRCINC;
 
@@ -74,13 +83,11 @@ void dac_sample_timer_init(void)
 
   TCC_enable(TCC0);
 
-  peripheral_port_init(&dac_timer_pin);
+  peripheral_port_init(&dac_sample_timer_pin);
 }
 
 #define DAC_DMAC_CHANNEL DMAC_CH0
 #define DAC_DMAC_PRILVL PRILVL0
-
-char serial_buffer[5000];
 
 void dac_init(void)
 {
@@ -121,6 +128,7 @@ void dac_init(void)
 
   peripheral_port_init(&dac_pin);
 }
+
 
 
 enum ECHO_SERIAL_CMD{
@@ -164,8 +172,8 @@ void setup()
   dac_sample_timer_init();
   DAC_enable();
 
-  TCC_enable(TCC2);
-  TCC_force_stop(TCC2);
+ TCC_enable(TCC2);
+ TCC_force_stop(TCC2);
 
 
   ML_DMAC_ENABLE();
@@ -286,14 +294,19 @@ void loop()
 
       Serial.write(ECHO_SERIAL_CMD::ACK);
       Serial.flush();
-
-      for(int i = 0; i < chirp_len; i++){
-        Serial.write(chirp_out_buffer[i]&0xff);
-        Serial.write(chirp_out_buffer[i]>>8&0xff);
-        if (i%64 == 0){
-          Serial.flush();
-        }
-      }
+      uint32_t crc_hash = calcHashCRC32(chirp_out_buffer,chirp_len);
+      Serial.write(crc_hash&0xff);
+      Serial.write((crc_hash >>8)&0xff);
+      Serial.write((crc_hash >>16)&0xff);
+      Serial.write((crc_hash >>24)&0xff);
+      Serial.flush();
+      // for(int i = 0; i < chirp_len; i++){
+      //   Serial.write(chirp_out_buffer[i]&0xff);
+      //   Serial.write(chirp_out_buffer[i]>>8&0xff);
+      //   if (i%64 == 0){
+      //     Serial.flush();
+      //   }
+      // }
  
 
       DOTSTAR_SET_GREEN();
@@ -301,6 +314,7 @@ void loop()
     }
     case ECHO_SERIAL_CMD::EMIT_CHIRP:{
       ML_DMAC_CHANNEL_RESUME(DAC_DMAC_CHANNEL);
+      // DMAC->SWTRIGCTRL.bit.SWTRIG0 = 0x01;
       
       Serial.write(ECHO_SERIAL_CMD::ACK);
 
