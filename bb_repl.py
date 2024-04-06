@@ -31,11 +31,15 @@ import yaml
 import serial
 import bb_gps
 import matplotlib.pylab as plt
+import matplotlib.mlab as mlab
+import matplotlib.colors as colors
 import logging
 import serial.tools.list_ports
 from PyQt6.QtWidgets import QApplication, QWidget
 import threading
 import bb_gui
+import os
+from scipy import signal
 
 logging.basicConfig(level=logging.WARNING)
 plt.set_loglevel("error")
@@ -86,14 +90,74 @@ def gen_fft(data)->tuple[np.ndarray,np.ndarray]:
     N = len(data)
     X = np.fft.fft(data)
     freqs = np.fft.fftfreq(N,d=1/1e6)
-
+    X[0] = 0
     return[X,freqs]
+
+
+def check_and_get_numpy_file(file_name:str,gain:float = 512,offset = 2048)->np.uint16:
+    if not os.path.exists(file_name):
+        print(f"File does not exist!")
+        return None
+    data = np.load(file_name)
+    data = convert_and_range_data(data)
+    return data
+
+def convert_and_range_data(data:np.ndarray,max_gain:float = 512,offset = 2048)->np.uint16:
+    data = data -np.min(data)
+    data = data/np.max(data) 
+    data = data*max_gain+ offset
+    return data.astype(np.uint16)
+
+def plot_spec(ax, fig, spec_tup, fbounds = (20E3, 100E3), dB_range = 40, plot_title = 'spec'):
+    
+    fmin, fmax = fbounds
+    s, f, t = spec_tup
+    
+    lfc = (f >= fmin).argmax()
+    s = 20*np.log10(s)
+    f_cut = f[lfc:]
+    s_cut = s[:][lfc:]
+
+    
+    max_s = np.amax(s_cut)
+    s_cut = s_cut - max_s
+    
+    [rows_s, cols_s] = np.shape(s_cut)
+    
+    dB = -dB_range
+    #for vc in cols_s:
+    #    vc = [dB if n < dB else n for n in vc]
+    
+    for col in range(cols_s):
+        for row in range(rows_s):
+            if s_cut[row][col] < dB:
+                s_cut[row][col] = dB
+                
+    cf = ax.pcolormesh(t, f_cut, s_cut, cmap='jet', shading='auto')
+    cbar = fig.colorbar(cf, ax=ax)
+    
+    ax.set_ylim(fmin, fmax)
+    ax.set_ylabel('Frequency (Hz)')
+    ax.set_xlabel('Time (sec)')
+    ax.title.set_text(plot_title)
+
+    cbar.ax.set_ylabel('dB')
+
+def process(raw, spec_settings, time_offs = 0):
+
+    unraw_balanced = raw - np.mean(raw)
+    
+    pt_cut = unraw_balanced[time_offs:]
+    remainder = unraw_balanced[:time_offs]
+    
+    Fs, NFFT, noverlap, window = spec_settings
+    spec_tup = mlab.specgram(pt_cut, Fs=Fs, NFFT=NFFT, noverlap=noverlap, window=window)
+    
+    return spec_tup, pt_cut, remainder
 
 class bb_repl(Cmd):
     """BatBot 7's repl interface class
     """
-    
-
     
     def __init__(self,yaml_cfg_file:str = 'bb_conf.yaml'):
         
@@ -115,8 +179,6 @@ class bb_repl(Cmd):
 
     
     def _startup(self):
-        
-        
         with open(self.yaml_cfg_file, "r") as f:
             # Load YAML data
             self.bb_config = yaml.safe_load(f)
@@ -134,10 +196,12 @@ class bb_repl(Cmd):
         """
         self.poutput('11.7v')
         
+
     def do_temp(self, _:Statement)->None:
         """Returns the temperature of the batbot
         """
         self.poutput('73f OK')
+
 
     def do_gui(self,args):
         self.app = QApplication.instance()
@@ -164,10 +228,6 @@ class bb_repl(Cmd):
             self.PinnaWidget.show()
             self.app.exec()
             
-
-
-
-
     
     config_parser = Cmd2ArgumentParser()
     config_parser.add_argument('-e','--emit_MCU',action='store_true',help="config emit board")
@@ -335,6 +395,8 @@ class bb_repl(Cmd):
     listen_parser.add_argument('listen_time_ms',type=int,help="Time to listen for in ms")
     listen_parser.add_argument('-p','--plot',action='store_true',help="Plot the results")
     listen_parser.add_argument('-fft','--fft',action='store_true',help="Plot the fft")
+    listen_parser.add_argument('-spec','--spec',action='store_true',help="Plot the spec")
+    listen_parser.add_argument('-of','--off',type=float,help="offset to start listening",default=0.001)
     @with_argparser(listen_parser)
     def do_listen(self,args):
         """Listen for echos 
@@ -343,7 +405,9 @@ class bb_repl(Cmd):
             args (_type_): _description_
         """
         
-        self.emit_MCU.write_cmd(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP)
+        tim = threading.Timer(args.off, self.emit_MCU.write_cmd, args=(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP,))
+        tim.start()
+
         _,L,R = self.record_MCU.listen(args.listen_time_ms)
         
         if args.plot and args.fft:
@@ -375,7 +439,10 @@ class bb_repl(Cmd):
             plt.xlabel('Frequency [Hz]')
             plt.ylabel('Magnitude')
             plt.xlim(0, Fs/2 )  # Display only positive frequencies
+            plt.ylim(0,np.max(np.abs(X)))
             plt.tight_layout()
+
+
             plt.show()    
             plt.close()   
         elif args.plot:
@@ -415,6 +482,36 @@ class bb_repl(Cmd):
             # plt.tight_layout()
             plt.show()    
             plt.close()
+        elif args.spec:
+            fig_spec, ax_spec = plt.subplots(nrows=2, figsize=(9,7))
+            plt.subplots_adjust(left=0.1,
+		        bottom=0.1,
+		        right=0.9,
+		        top=0.9,
+		        wspace=0.4,
+		        hspace=0.4)
+            Fs = 1E6
+            Ts = 1/Fs
+            NFFT = 512
+            noverlap = 400
+            #window = signal.windows.kaiser(NFFT, beta = 0.1)
+            window = signal.windows.hann(NFFT)
+            spec_settings = (Fs, NFFT, noverlap, window)
+            DB_range = 40
+            f_plot_bounds = (30E3, 100E3)
+            
+            spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
+            
+            plot_spec(ax_spec[0], fig_spec, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='ear')
+            
+            # ax_spec[1]
+
+            spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
+            
+            plot_spec(ax_spec[1], fig_spec, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='no ear')
+            # ax_spec[3].plot(L)
+            
+            plt.show(block=True)
             
 
     upload_sine_parser = Cmd2ArgumentParser()
@@ -422,11 +519,12 @@ class bb_repl(Cmd):
     upload_sine_parser.add_argument('-t','--time',help='Time in ms to chirp, max is 60ms',type=int,default=30)
     upload_sine_parser.add_argument('-p','--plot',help='Preview',action='store_true')
     upload_sine_parser.add_argument('-fft','--fft',help='fft plot',action='store_true')
-    upload_sine_parser.add_argument('-g','--gain',help='typical gain',type=int,default=2040)
+    upload_sine_parser.add_argument('-g','--gain',help='typical gain',type=int,default=512)
     @with_argparser(upload_sine_parser)
     def do_upload_sine(self,args):
         freq = convert_khz(args.freq)
         
+
         [s,t] = self.emit_MCU.gen_sine(args.time,freq,args.gain)
         
         if args.plot and args.fft:
@@ -460,7 +558,6 @@ class bb_repl(Cmd):
             plt.close()            
         
         val = input(f"Sure you want to upload? y/n: ")
-        
         while True:
             if val.lower() == 'y':
                 break
@@ -475,7 +572,7 @@ class bb_repl(Cmd):
     upload_chirp_parser.add_argument('-f0','--freq0',help='start freq',required=True,type=str)
     upload_chirp_parser.add_argument('-f1','--freq1',help='end freq',required=True,type=str)
     upload_chirp_parser.add_argument('-t','--time',help='Time in ms to chirp, max is 60ms',type=int,default=30)
-    upload_chirp_parser.add_argument('-g','--gain',help='gain to boost signal for DAC',type=int,default=2040)
+    upload_chirp_parser.add_argument('-g','--gain',help='gain to boost signal for DAC',type=int,default=512)
     upload_chirp_parser.add_argument('-m','--method',help='linear, quadratic..',type=str,default='linear')
     upload_chirp_parser.add_argument('-p','--plot',help='Preview',action='store_true')
     upload_chirp_parser.add_argument('-fft','--fft',help='Preview',action='store_true')
@@ -501,7 +598,8 @@ class bb_repl(Cmd):
             plt.title('FFT')
             plt.xlabel('Frequency [Hz]')
             plt.ylabel('Magnitude')
-            plt.xlim(0, 1e6/2 )  # Display only positive frequencies
+            plt.xlim(0, 500e3 )  # Display only positive frequencies
+            # plt.ylim(0,1e6)
             plt.show()
             plt.close()
         elif args.plot:

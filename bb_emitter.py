@@ -34,7 +34,19 @@ def show_cursor():
     sys.stdout.write("\033[?25h")  # Show cursor
     sys.stdout.flush()
 
+def check_and_get_numpy_file(file_name:str,gain:float = 512,offset = 2048)->np.uint16:
+    if not os.path.exists(file_name):
+        print(f"File does not exist!")
+        return None
+    data = np.load(file_name)
+    data = convert_and_range_data(data)
+    return data
 
+def convert_and_range_data(data:np.ndarray,max_gain:float = 512,offset = 2048)->np.uint16:
+    data = data -np.min(data)
+    data = data/np.max(data) 
+    data = data*max_gain+ offset
+    return data.astype(np.uint16)
 
 class t_colors:
     HEADER = '\033[95m'
@@ -255,82 +267,72 @@ class EchoEmitter:
         
         return self.max_chirp_length
 
-        
-    def check_chirp(self,data = None, file:str = None):
-        pass
-    
-    def convert_chirp(self,data = None, file:str = None):
-        pass
-    
-    def chirp(self,data = None, file:str = None):
-        pass
     
     
-    def gen_chirp(self,f_start:int,f_end:int, t_end:int,method:str ='linear',gain:np.uint16 = 2040)->tuple[np.uint16,np.ndarray]:
-        # if t_end > 60:
-        #     print(f"{t_colors.FAIL}time {t_end} too large!{t_colors.ENDC}")
-        #     return
-        
+    def gen_chirp(self,f_start:int,f_end:int, t_end:int,method:str ='linear',gain:np.uint16 = 512,offset = 2048)->tuple[np.uint16,np.ndarray]:
         Fs = 1e6
         Ts = 1/Fs
         t = np.arange(0,t_end*1e-3 - Ts/2,Ts)
         chirp = signal.chirp(t,f_start,t_end*1e-3,f_end,method)
-        chirp = chirp + 1
-        chirp = chirp*gain
+        # chirp = chirp + 1
+        # chirp = chirp*gain
 
-        chirp = chirp.astype(np.uint16)
+        # chirp = chirp.astype(np.uint16)
+        chirp = convert_and_range_data(chirp,gain,offset)
 
         return [chirp,t]
     
-    def gen_sine(self,time_ms:np.uint16, freq:np.uint16,gain:np.uint16 = 2040)->tuple[np.uint16,np.ndarray]:
-        # if time_ms > 60:
-        #     print(f"{t_colors.FAIL}time {time} too large!{t_colors.ENDC}")
-        #     return
-        
+    def gen_sine(self,time_ms:np.uint16, freq:np.uint16,gain:np.uint16 = 512,offset = 2048)->tuple[np.uint16,np.ndarray]:
         DATA_LEN = int(time_ms*1e3)
         duration = DATA_LEN / 1e6  # Duration of the sine wave (in seconds)
         
         t = np.linspace(0, duration, DATA_LEN, endpoint=False)
         
-        sin_wave = 1 + np.sin(2 * np.pi * freq *t)
-        sin_wave = sin_wave*gain
-        sin_wave = sin_wave.astype(np.uint16)
+        sin_wave = np.sin(2 * np.pi * freq *t)
+        # sin_wave = sin_wave*gain
+        # sin_wave = sin_wave.astype(np.uint16)
+        sin_wave = convert_and_range_data(sin_wave,gain,offset)
         
         return [sin_wave,t]
 
+
+
+
+
 if __name__ == '__main__':
-    emitter = EchoEmitter(Serial('/dev/tty.usbmodem14101',baudrate=960000))
-
-    DATA_LEN = 30000
-    
+    emitter = EchoEmitter(Serial('COM5',baudrate=960000))
 
 
-    frequency = 10e3  # Frequency of the sine wave (in Hz)
-    sample_rate = 1000000  # Sampling rate (number of samples per second)
-    duration = DATA_LEN / sample_rate  # Duration of the sine wave (in seconds)
 
-    # Generate time values
-    # t = np.linspace(0, duration, DATA_LEN, endpoint=False)
 
-    # Generate sine wave values
-    # sin_wave = 1+np.sin(2 * np.pi * frequency * t)
-    # sin_wave = sin_wave*2000
-    # sin_wave = sin_wave.astype(np.uint16)
-    
-    # sin_wave,t = emitter.gen_sine(40,30e3)
     sin_wave, t = emitter.gen_chirp(90e3,40e3,30)
 
-    # plt.figure()
-    # plt.plot(t,sin_wave,'o-')
+    np.save('sine_uint16.npy',sin_wave)
 
-    # plt.show()
+    DATA_LEN = int(30*1e3)
+    duration = DATA_LEN / 1e6  # Duration of the sine wave (in seconds)
+        
+    t = np.linspace(0, duration, DATA_LEN, endpoint=False)
+        
+    d1 = np.sin(2 * np.pi * 50e3 *t)
+    np.save('sine_float.npy',d1)
 
-    print(f"len {len(t)} len {len(sin_wave)}")
 
-    emitter.upload_chirp(sin_wave)
+    check_and_get_numpy_file('sine_uint16.npy')
 
-    # emitter.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)
-    # emitter.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)
-    # emitter.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)
-    # emitter.write_cmd(ECHO_SERIAL_CMD.EMIT_CHIRP)
+    clean = check_and_get_numpy_file('sine_float.npy')
+
+    plt.figure()
+    plt.subplot(1,2,1)
+    plt.plot(d1,'o-')
+    plt.xlim([0 ,200])
+
+    plt.subplot(1,2,2)
+    plt.plot(clean,'o-')
+    plt.xlim([0, 200])
+    plt.show()
+
+
+    # emitter.upload_chirp(sin_wave)
+
 
