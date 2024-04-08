@@ -94,21 +94,9 @@ def gen_fft(data)->tuple[np.ndarray,np.ndarray]:
     return[X,freqs]
 
 
-def check_and_get_numpy_file(file_name:str,gain:float = 512,offset = 2048)->np.uint16:
-    if not os.path.exists(file_name):
-        print(f"File does not exist!")
-        return None
-    data = np.load(file_name)
-    data = convert_and_range_data(data)
-    return data
 
-def convert_and_range_data(data:np.ndarray,max_gain:float = 512,offset = 2048)->np.uint16:
-    data = data -np.min(data)
-    data = data/np.max(data) 
-    data = data*max_gain+ offset
-    return data.astype(np.uint16)
 
-def plot_spec(ax, fig, spec_tup, fbounds = (20E3, 100E3), dB_range = 40, plot_title = 'spec'):
+def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_title = 'spec'):
     
     fmin, fmax = fbounds
     s, f, t = spec_tup
@@ -125,8 +113,6 @@ def plot_spec(ax, fig, spec_tup, fbounds = (20E3, 100E3), dB_range = 40, plot_ti
     [rows_s, cols_s] = np.shape(s_cut)
     
     dB = -dB_range
-    #for vc in cols_s:
-    #    vc = [dB if n < dB else n for n in vc]
     
     for col in range(cols_s):
         for row in range(rows_s):
@@ -142,6 +128,23 @@ def plot_spec(ax, fig, spec_tup, fbounds = (20E3, 100E3), dB_range = 40, plot_ti
     ax.title.set_text(plot_title)
 
     cbar.ax.set_ylabel('dB')
+ 
+            
+def plot_time(ax, fig,Fs,plot_data)->None:
+    T = 1/Fs
+    x_vals = np.linspace(0,len(plot_data)/Fs,num=len(plot_data))
+    ax.plot(x_vals,plot_data,'o-',markersize=0.2)
+    ax.title.set_text('Time')
+    
+def plot_fft(ax:plt.axes,fig:plt.figure,Fs,plot_data)->None:
+    [X,freqs] = gen_fft(plot_data)
+    
+    ax.plot(freqs,np.abs(X),linewidth=1)
+    ax.title.set_text('FFT')
+    ax.set_xlabel('Frequency [Hz]')
+    ax.set_ylabel('Magnitude')
+    ax.set_xlim(0,Fs/2)
+    
 
 def process(raw, spec_settings, time_offs = 0):
 
@@ -154,6 +157,14 @@ def process(raw, spec_settings, time_offs = 0):
     spec_tup = mlab.specgram(pt_cut, Fs=Fs, NFFT=NFFT, noverlap=noverlap, window=window)
     
     return spec_tup, pt_cut, remainder
+
+
+            
+
+
+
+
+
 
 class bb_repl(Cmd):
     """BatBot 7's repl interface class
@@ -180,7 +191,6 @@ class bb_repl(Cmd):
     
     def _startup(self):
         with open(self.yaml_cfg_file, "r") as f:
-            # Load YAML data
             self.bb_config = yaml.safe_load(f)
         
         self.poutput(f"{t_colors.WARNING}Checking system...{t_colors.ENDC}")
@@ -396,7 +406,7 @@ class bb_repl(Cmd):
     listen_parser.add_argument('-p','--plot',action='store_true',help="Plot the results")
     listen_parser.add_argument('-fft','--fft',action='store_true',help="Plot the fft")
     listen_parser.add_argument('-spec','--spec',action='store_true',help="Plot the spec")
-    listen_parser.add_argument('-of','--off',type=float,help="offset to start listening",default=0.001)
+    listen_parser.add_argument('-of','--off',type=float,help="offset to start listening",default=0.008)
     @with_argparser(listen_parser)
     def do_listen(self,args):
         """Listen for echos 
@@ -412,89 +422,48 @@ class bb_repl(Cmd):
         
         if args.plot and args.fft:
             Fs = self.record_MCU.sample_freq
-            T = 1/Fs
-            x_vals = np.linspace(0,len(L)/Fs,num=len(L))
-            plt.figure()
-            plt.subplot(2,2,1)
-            plt.plot(x_vals,L,'o-',markersize=0.2)
-            plt.xlabel("Time")
-            plt.subplot(2,2,2)
-            plt.plot(x_vals,R,markersize=0.2)
-            plt.xlabel("Time")   
-
-
-            [X,freqs] = gen_fft(L)
-            plt.subplot(2,2,3)
-            plt.plot(freqs, np.abs(X),linewidth=1)
-            plt.title('FFT')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Magnitude')
-            plt.xlim(0, Fs/2 )  # Display only positive frequencies
-   
-    
-            [X,freqs] = gen_fft(R)
-            plt.subplot(2,2,4)
-            plt.plot(freqs, np.abs(X),linewidth=1)
-            plt.title('FFT')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Magnitude')
-            plt.xlim(0, Fs/2 )  # Display only positive frequencies
-            plt.ylim(0,np.max(np.abs(X)))
-            plt.tight_layout()
+            fig,ax = plt.subplots(ncols=2,nrows=2)
+            plot_time(ax[0,0],fig,Fs,L)
+            plot_time(ax[0,1],fig,Fs,R)
+            
+            plot_fft(ax[1,0],fig,Fs,L)
+            plot_fft(ax[1,1],fig,Fs,R)
 
 
             plt.show()    
             plt.close()   
         elif args.plot:
             Fs = self.record_MCU.sample_freq
-            T = 1/Fs
-            x_vals = np.linspace(0,len(L)/Fs,num=len(L))
-            plt.figure()
-            plt.subplot(1,2,1)
-            plt.plot(x_vals,L)
-            plt.xlabel("Time")
-            plt.subplot(1,2,2)
-            plt.plot(x_vals,R)
-            plt.xlabel("Time")   
+            fig,ax = plt.subplots(ncols=2)
+            
+            plot_time(ax[0],fig,Fs,L)
+            plot_time(ax[1],fig,Fs,R)
+            
             plt.show()
             plt.close()
-            
+                        
         elif args.fft:
-            # do fft
-            plt.figure()
-
-            [X,freqs]= gen_fft(L)
-            plt.subplot(1,2,1)
-            plt.plot(freqs, np.abs(X),'-',linewidth=1)
-            plt.title('FFT')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Magnitude')
-            plt.xlim(0, Fs/2 )  # Display only positive frequencies
-   
-
-            [X,freqs]= gen_fft(R)
-            plt.subplot(1,2,2)
-            plt.plot(freqs, np.abs(X),'-',linewidth=1)
-            plt.title('FFT')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Magnitude')
-            plt.xlim(0, Fs/2 )  # Display only positive frequencies
-            # plt.tight_layout()
+            Fs = self.record_MCU.sample_freq
+            fig,ax = plt.subplots(ncols=2)
+            plot_fft(ax[0],fig,Fs,L)
+            plot_fft(ax[1],fig,Fs,R)
+            
             plt.show()    
             plt.close()
         elif args.spec:
             fig_spec, ax_spec = plt.subplots(nrows=2, figsize=(9,7))
+        
             plt.subplots_adjust(left=0.1,
 		        bottom=0.1,
 		        right=0.9,
 		        top=0.9,
 		        wspace=0.4,
 		        hspace=0.4)
+            
             Fs = 1E6
             Ts = 1/Fs
             NFFT = 512
             noverlap = 400
-            #window = signal.windows.kaiser(NFFT, beta = 0.1)
             window = signal.windows.hann(NFFT)
             spec_settings = (Fs, NFFT, noverlap, window)
             DB_range = 40
@@ -503,15 +472,13 @@ class bb_repl(Cmd):
             spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
             
             plot_spec(ax_spec[0], fig_spec, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='ear')
-            
-            # ax_spec[1]
 
             spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
             
             plot_spec(ax_spec[1], fig_spec, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='no ear')
-            # ax_spec[3].plot(L)
             
-            plt.show(block=True)
+            plt.show()
+            plt.close()
             
 
     upload_sine_parser = Cmd2ArgumentParser()
@@ -528,34 +495,28 @@ class bb_repl(Cmd):
         [s,t] = self.emit_MCU.gen_sine(args.time,freq,args.gain)
         
         if args.plot and args.fft:
-            plt.figure()
-            plt.subplot(1,2,1)
-            plt.plot(t,s,'o-',linewidth=0.4,markersize=0.4)
-
-            [X,freqs] = gen_fft(s)
-            plt.subplot(1,2,2)
-            plt.plot(freqs,np.abs(X),'-',linewidth = 1)
-            plt.title('FFT')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Magnitude')
-            plt.xlim(0, 1e6/2 )  # Display only positive frequencies
+            fig,ax = plt.subplots(ncols=2)
+            Fs = self.record_MCU.sample_freq
+            
+            plot_time(ax[0],fig,Fs,s)
+            plot_fft(ax[1],fig,Fs,s)
+            
             plt.show()
             plt.close()
         elif args.plot:
-            plt.figure()
-            plt.plot(t,s,'o-',linewidth=0.4,markersize=0.4)
+
+            fig,ax = plt.subplots(ncols=1)
+            Fs = self.record_MCU.sample_freq
+            plot_time(ax,fig,Fs,s)
             plt.show()
             plt.close()
         elif args.fft:
-            plt.figure()
-            [X,freqs] = gen_fft(s)
-            plt.plot(freqs,np.abs(X),'-',linewidth = 1)
-            plt.title('FFT')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Magnitude')
-            plt.xlim(0, 1e6/2 )  # Display only positive frequencies
+            fig,ax = plt.subplots(ncols=1)
+            Fs = self.record_MCU.sample_freq
+            plot_fft(ax,fig,Fs,s)
+            
             plt.show()
-            plt.close()            
+            plt.close()        
         
         val = input(f"Sure you want to upload? y/n: ")
         while True:
@@ -588,33 +549,26 @@ class bb_repl(Cmd):
         [s,t] = self.emit_MCU.gen_chirp(freq0,freq1,args.time,args.method,args.gain)
 
         if args.plot and args.fft:
-            plt.figure()
-            plt.subplot(1,2,1)
-            plt.plot(t,s,'o-',linewidth=0.4,markersize=0.4)
-
-            [X,freqs] = gen_fft(s)
-            plt.subplot(1,2,2)
-            plt.plot(freqs,np.abs(X),'-',linewidth = 1)
-            plt.title('FFT')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Magnitude')
-            plt.xlim(0, 500e3 )  # Display only positive frequencies
-            # plt.ylim(0,1e6)
+            fig,ax = plt.subplots(ncols=2)
+            Fs = self.record_MCU.sample_freq
+            
+            plot_time(ax[0],fig,Fs,s)
+            plot_fft(ax[1],fig,Fs,s)
+            
             plt.show()
             plt.close()
         elif args.plot:
-            plt.figure()
-            plt.plot(t,s,'o-',linewidth=0.4,markersize=0.4)
+
+            fig,ax = plt.subplots(ncols=1)
+            Fs = self.record_MCU.sample_freq
+            plot_time(ax,fig,Fs,s)
             plt.show()
             plt.close()
         elif args.fft:
-            plt.figure()
-            [X,freqs] = gen_fft(s)
-            plt.plot(freqs,np.abs(X),'-',linewidth = 1)
-            plt.title('FFT')
-            plt.xlabel('Frequency [Hz]')
-            plt.ylabel('Magnitude')
-            plt.xlim(0, 1e6/2 )  # Display only positive frequencies
+            fig,ax = plt.subplots(ncols=1)
+            Fs = self.record_MCU.sample_freq
+            plot_fft(ax,fig,Fs,s)
+            
             plt.show()
             plt.close()     
 

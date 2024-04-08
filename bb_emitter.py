@@ -42,11 +42,6 @@ def check_and_get_numpy_file(file_name:str,gain:float = 512,offset = 2048)->np.u
     data = convert_and_range_data(data)
     return data
 
-def convert_and_range_data(data:np.ndarray,max_gain:float = 512,offset = 2048)->np.uint16:
-    data = data -np.min(data)
-    data = data/np.max(data) 
-    data = data*max_gain+ offset
-    return data.astype(np.uint16)
 
 class t_colors:
     HEADER = '\033[95m'
@@ -75,6 +70,9 @@ class EchoEmitter:
         self.output_t = 1/output_freq
         
         self.chirp_uploaded = False
+        
+        self.SIG_GAIN = 512
+        self.SIG_OFFSET = 2048
     
     def connect_Serial(self,serial:Serial):
         self.itsy = serial
@@ -269,31 +267,52 @@ class EchoEmitter:
 
     
     
-    def gen_chirp(self,f_start:int,f_end:int, t_end:int,method:str ='linear',gain:np.uint16 = 512,offset = 2048)->tuple[np.uint16,np.ndarray]:
+    def gen_chirp(self,f_start:int,f_end:int, t_end:int,method:str ='linear',gain:float = None,offset = None)->tuple[np.uint16,np.ndarray]:
         Fs = 1e6
         Ts = 1/Fs
         t = np.arange(0,t_end*1e-3 - Ts/2,Ts)
         chirp = signal.chirp(t,f_start,t_end*1e-3,f_end,method)
-        # chirp = chirp + 1
-        # chirp = chirp*gain
-
-        # chirp = chirp.astype(np.uint16)
-        chirp = convert_and_range_data(chirp,gain,offset)
+        chirp = self.convert_and_range_data(chirp,gain,offset)
 
         return [chirp,t]
     
-    def gen_sine(self,time_ms:np.uint16, freq:np.uint16,gain:np.uint16 = 512,offset = 2048)->tuple[np.uint16,np.ndarray]:
+    def gen_sine(self,time_ms:np.uint16, freq:np.uint16,gain:float = None,offset = None)->tuple[np.uint16,np.ndarray]:
         DATA_LEN = int(time_ms*1e3)
         duration = DATA_LEN / 1e6  # Duration of the sine wave (in seconds)
         
         t = np.linspace(0, duration, DATA_LEN, endpoint=False)
         
         sin_wave = np.sin(2 * np.pi * freq *t)
-        # sin_wave = sin_wave*gain
-        # sin_wave = sin_wave.astype(np.uint16)
-        sin_wave = convert_and_range_data(sin_wave,gain,offset)
+        sin_wave = self.convert_and_range_data(sin_wave,gain,offset)
         
         return [sin_wave,t]
+    
+    def convert_and_range_data(self,data:np.ndarray,gain:float = None,offset:float =None)->np.uint16:
+        data = data - np.min(data)
+        data = data/np.max(data)
+        
+        g = self.SIG_GAIN
+        if gain is not None:
+            g = gain
+        
+        of = self.SIG_OFFSET
+        if offset is not None:
+            of = offset
+            
+        data = data*g + of
+        
+        return data.astype(np.uint16)
+    
+    def get_and_convert_numpy(self,file_name:str,gain:float = None,offset = None)->np.uint16:
+        if not os.path.exists(file_name):
+            print(f"File does not exist!")
+            return None
+        data = np.load(file_name)
+        data = self.convert_and_range_data(data,gain,offset)
+        return data
+
+        
+
 
 
 
