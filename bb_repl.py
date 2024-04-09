@@ -96,7 +96,7 @@ def gen_fft(data)->tuple[np.ndarray,np.ndarray]:
 
 
 
-def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_title = 'spec'):
+def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_title = 'spec',use_khz=True):
     
     fmin, fmax = fbounds
     s, f, t = spec_tup
@@ -128,13 +128,18 @@ def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_ti
     ax.title.set_text(plot_title)
 
     cbar.ax.set_ylabel('dB')
+    if use_khz:
+        make_khz_ytick(ax)
  
             
-def plot_time(ax, fig,Fs,plot_data)->None:
+def plot_time(ax, fig,Fs,plot_data,use_ms=True)->None:
     T = 1/Fs
     x_vals = np.linspace(0,len(plot_data)/Fs,num=len(plot_data))
     ax.plot(x_vals,plot_data,'o-',markersize=0.2)
     ax.title.set_text('Time')
+    if use_ms:
+        make_ms_xtick(ax)
+
     
 def plot_fft(ax:plt.axes,fig:plt.figure,Fs,plot_data)->None:
     [X,freqs] = gen_fft(plot_data)
@@ -144,6 +149,38 @@ def plot_fft(ax:plt.axes,fig:plt.figure,Fs,plot_data)->None:
     ax.set_xlabel('Frequency [Hz]')
     ax.set_ylabel('Magnitude')
     ax.set_xlim(0,Fs/2)
+    make_khz_xtick(ax)
+
+def make_khz_ytick(ax):
+    # Get the current tick positions
+    current_ticks = ax.get_yticks()
+    # Convert tick positions to kHz and create labels
+    new_tick_positions = current_ticks /1000
+    new_tick_labels = ['{}kHz'.format(int(tick)) for tick in new_tick_positions]
+    # Set y-axis ticks and labels
+    # ax.set_yticks(current_ticks)
+    ax.set_yticklabels(new_tick_labels)
+
+def make_khz_xtick(ax):
+    # Get the current tick positions
+    current_ticks = ax.get_xticks()
+    # Convert tick positions to kHz and create labels
+    new_tick_positions = current_ticks /1000
+    new_tick_labels = ['{}kHz'.format(int(tick)) for tick in new_tick_positions]
+    # Set y-axis ticks and labels
+    ax.set_xticks(current_ticks)
+    ax.set_xticklabels(new_tick_labels)
+    
+def make_ms_xtick(ax):
+        # Get the current tick positions
+    current_ticks = ax.get_xticks()
+    # Convert tick positions to kHz and create labels
+    new_tick_positions = current_ticks *1000
+    new_tick_labels = ['{}ms'.format(int(tick)) for tick in new_tick_positions]
+    # Set y-axis ticks and labels
+    ax.set_xticks(current_ticks)
+    ax.set_xticklabels(new_tick_labels)
+
     
 
 def process(raw, spec_settings, time_offs = 0):
@@ -185,7 +222,12 @@ class bb_repl(Cmd):
         self.PinnaWidget = None
         
         super().__init__()
+        
+        self.phase_ears = False
+        self.add_settable(Settable('phase_ears',bool,'when true pinnas move out of phase from each other',self))
+        
         self._startup()
+        
         
 
     
@@ -195,7 +237,6 @@ class bb_repl(Cmd):
         
         self.poutput(f"{t_colors.WARNING}Checking system...{t_colors.ENDC}")
     
-            
         
         self.do_status(None)
         self.do_config('')
@@ -224,7 +265,10 @@ class bb_repl(Cmd):
 
     
     pinna_parser = Cmd2ArgumentParser()
+    pinna_parser.add_argument('motor_number',type=int)
+    pinna_parser.add_argument('motor_angle',type=int)
     pinna_parser.add_argument('-g','--gui',action='store_true')
+    pinna_parser.add_argument('-cal','--calibrate',action='store_true')
     @with_argparser(pinna_parser)
     def do_pinna(self,args):
         if args.gui:
@@ -237,6 +281,14 @@ class bb_repl(Cmd):
 
             self.PinnaWidget.show()
             self.app.exec()
+            
+        if args.calibrate:
+            l_lims = self.L_pinna_MCU.calibrate_and_get_motor_limits()
+            r_lims = self.R_pinna_MCU.calibrate_and_get_motor_limits()
+            
+        self.poutput(f"{args}")
+            
+        
             
     
     config_parser = Cmd2ArgumentParser()
@@ -420,65 +472,58 @@ class bb_repl(Cmd):
 
         _,L,R = self.record_MCU.listen(args.listen_time_ms)
         
-        if args.plot and args.fft:
-            Fs = self.record_MCU.sample_freq
-            fig,ax = plt.subplots(ncols=2,nrows=2)
-            plot_time(ax[0,0],fig,Fs,L)
-            plot_time(ax[0,1],fig,Fs,R)
-            
-            plot_fft(ax[1,0],fig,Fs,L)
-            plot_fft(ax[1,1],fig,Fs,R)
-
-
-            plt.show()    
-            plt.close()   
-        elif args.plot:
-            Fs = self.record_MCU.sample_freq
-            fig,ax = plt.subplots(ncols=2)
-            
-            plot_time(ax[0],fig,Fs,L)
-            plot_time(ax[1],fig,Fs,R)
-            
-            plt.show()
-            plt.close()
-                        
-        elif args.fft:
-            Fs = self.record_MCU.sample_freq
-            fig,ax = plt.subplots(ncols=2)
-            plot_fft(ax[0],fig,Fs,L)
-            plot_fft(ax[1],fig,Fs,R)
-            
-            plt.show()    
-            plt.close()
-        elif args.spec:
-            fig_spec, ax_spec = plt.subplots(nrows=2, figsize=(9,7))
+        num_axes = 0
+        rows = 0
+        if args.plot:
+            rows +=1 
+        if args.fft:
+            rows +=1
+        if args.spec:
+            rows +=1
         
-            plt.subplots_adjust(left=0.1,
-		        bottom=0.1,
-		        right=0.9,
-		        top=0.9,
-		        wspace=0.4,
-		        hspace=0.4)
+        fig,axes = plt.subplots(nrows=rows,ncols=2)
+        Fs = self.record_MCU.sample_freq
+        cur_row = 0
+        if args.plot:
+            if rows > 1:
+                plot_time(axes[cur_row,0],fig,Fs,L)
+                plot_time(axes[cur_row,1],fig,Fs,R)
+            else:
+                plot_time(axes[0],fig,Fs,L)
+                plot_time(axes[1],fig,Fs,R)
+            cur_row += 1
+        if args.fft:
+            if rows > 1:
+                plot_fft(axes[cur_row,0],fig,Fs,L)
+                plot_fft(axes[cur_row,1],fig,Fs,R)
+            else:
+                plot_fft(axes[0],fig,Fs,L)
+                plot_fft(axes[1],fig,Fs,R)
             
-            Fs = 1E6
-            Ts = 1/Fs
+            
+            cur_row += 1
+        if args.spec:
             NFFT = 512
             noverlap = 400
-            window = signal.windows.hann(NFFT)
-            spec_settings = (Fs, NFFT, noverlap, window)
+            spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
             DB_range = 40
             f_plot_bounds = (30E3, 100E3)
             
             spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
-            
-            plot_spec(ax_spec[0], fig_spec, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='ear')
-
             spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
             
-            plot_spec(ax_spec[1], fig_spec, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='no ear')
+            if rows > 1:
+                plot_spec(axes[cur_row,0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear')
+                plot_spec(axes[cur_row,1], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear')
+            else:
+                plot_spec(axes[0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear')
+                plot_spec(axes[1], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear')
+                
             
-            plt.show()
-            plt.close()
+        plt.subplots_adjust(wspace=0.5,hspace=0.3)
+        plt.show()
+        plt.close()
+        
             
 
     upload_sine_parser = Cmd2ArgumentParser()
