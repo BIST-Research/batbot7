@@ -480,8 +480,8 @@ class bb_repl(Cmd):
             rows +=1
         if args.spec:
             rows +=1
-        
-        fig,axes = plt.subplots(nrows=rows,ncols=2)
+        if rows > 0:
+            fig,axes = plt.subplots(nrows=rows,ncols=2)
         Fs = self.record_MCU.sample_freq
         cur_row = 0
         if args.plot:
@@ -514,15 +514,15 @@ class bb_repl(Cmd):
             
             if rows > 1:
                 plot_spec(axes[cur_row,0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear')
-                plot_spec(axes[cur_row,1], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear')
+                plot_spec(axes[cur_row,1], fig, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear')
             else:
                 plot_spec(axes[0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear')
-                plot_spec(axes[1], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear')
+                plot_spec(axes[1], fig, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear')
                 
-            
-        plt.subplots_adjust(wspace=0.5,hspace=0.3)
-        plt.show()
-        plt.close()
+        if rows > 0:
+            plt.subplots_adjust(wspace=0.5,hspace=0.8)
+            plt.show()
+            plt.close()
         
             
 
@@ -531,6 +531,7 @@ class bb_repl(Cmd):
     upload_sine_parser.add_argument('-t','--time',help='Time in ms to chirp, max is 60ms',type=int,default=30)
     upload_sine_parser.add_argument('-p','--plot',help='Preview',action='store_true')
     upload_sine_parser.add_argument('-fft','--fft',help='fft plot',action='store_true')
+    upload_sine_parser.add_argument('-spec','--spec',help='spectogram plot',action='store_true')
     upload_sine_parser.add_argument('-g','--gain',help='typical gain',type=int,default=512)
     @with_argparser(upload_sine_parser)
     def do_upload_sine(self,args):
@@ -539,29 +540,48 @@ class bb_repl(Cmd):
 
         [s,t] = self.emit_MCU.gen_sine(args.time,freq,args.gain)
         
-        if args.plot and args.fft:
-            fig,ax = plt.subplots(ncols=2)
-            Fs = self.record_MCU.sample_freq
+        num_axes = 0
+        rows = 0
+        if args.plot:
+            rows +=1 
+        if args.fft:
+            rows +=1
+        if args.spec:
+            rows +=1
+        if rows > 0:
+            fig,axes = plt.subplots(nrows=rows)
+        Fs = self.record_MCU.sample_freq
+        cur_row = 0
+        if args.plot:
+            if rows > 1:
+                plot_time(axes[cur_row],fig,Fs,s)
+            else:
+                plot_time(axes,fig,Fs,s)
+            cur_row += 1
+        if args.fft:
+            if rows >1:
+                plot_fft(axes[cur_row],fig,Fs,s)
+            else:
+                plot_fft(axes,fig,Fs,s)
+                
+            cur_row += 1
+        if args.spec:
+            NFFT = 512
+            noverlap = 400
+            spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
+            DB_range = 40
+            f_plot_bounds = (30E3, 100E3)
             
-            plot_time(ax[0],fig,Fs,s)
-            plot_fft(ax[1],fig,Fs,s)
-            
+            spec_tup1, pt_cut1, pt1 = process(s, spec_settings, time_offs=0)
+            if rows> 1:
+                plot_spec(axes[cur_row], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Spec')
+            else:
+                plot_spec(axes, fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Spec')
+                
+        if rows > 0:
+            plt.subplots_adjust(wspace=0.5,hspace=0.8)
             plt.show()
-            plt.close()
-        elif args.plot:
-
-            fig,ax = plt.subplots(ncols=1)
-            Fs = self.record_MCU.sample_freq
-            plot_time(ax,fig,Fs,s)
-            plt.show()
-            plt.close()
-        elif args.fft:
-            fig,ax = plt.subplots(ncols=1)
-            Fs = self.record_MCU.sample_freq
-            plot_fft(ax,fig,Fs,s)
-            
-            plt.show()
-            plt.close()        
+            plt.close()      
         
         val = input(f"Sure you want to upload? y/n: ")
         while True:
@@ -582,6 +602,7 @@ class bb_repl(Cmd):
     upload_chirp_parser.add_argument('-m','--method',help='linear, quadratic..',type=str,default='linear')
     upload_chirp_parser.add_argument('-p','--plot',help='Preview',action='store_true')
     upload_chirp_parser.add_argument('-fft','--fft',help='Preview',action='store_true')
+    upload_chirp_parser.add_argument('-spec','--spec',help='Preview',action='store_true')
     @with_argparser(upload_chirp_parser)
     def do_upload_chirp(self,args):
         freq0 = convert_khz(args.freq0)
@@ -593,29 +614,49 @@ class bb_repl(Cmd):
 
         [s,t] = self.emit_MCU.gen_chirp(freq0,freq1,args.time,args.method,args.gain)
 
-        if args.plot and args.fft:
-            fig,ax = plt.subplots(ncols=2)
-            Fs = self.record_MCU.sample_freq
+         
+        num_axes = 0
+        rows = 0
+        if args.plot:
+            rows +=1 
+        if args.fft:
+            rows +=1
+        if args.spec:
+            rows +=1
+        if rows > 0:
+            fig,axes = plt.subplots(nrows=rows)
+        Fs = self.record_MCU.sample_freq
+        cur_row = 0
+        if args.plot:
+            if rows > 1:
+                plot_time(axes[cur_row],fig,Fs,s)
+            else:
+                plot_time(axes,fig,Fs,s)
+            cur_row += 1
+        if args.fft:
+            if rows >1:
+                plot_fft(axes[cur_row],fig,Fs,s)
+            else:
+                plot_fft(axes,fig,Fs,s)
+                
+            cur_row += 1
+        if args.spec:
+            NFFT = 512
+            noverlap = 400
+            spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
+            DB_range = 40
+            f_plot_bounds = (30E3, 100E3)
             
-            plot_time(ax[0],fig,Fs,s)
-            plot_fft(ax[1],fig,Fs,s)
-            
+            spec_tup1, pt_cut1, pt1 = process(s, spec_settings, time_offs=0)
+            if rows> 1:
+                plot_spec(axes[cur_row], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Spec')
+            else:
+                plot_spec(axes, fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Spec')
+                
+        if rows > 0:
+            plt.subplots_adjust(wspace=0.5,hspace=0.8)
             plt.show()
             plt.close()
-        elif args.plot:
-
-            fig,ax = plt.subplots(ncols=1)
-            Fs = self.record_MCU.sample_freq
-            plot_time(ax,fig,Fs,s)
-            plt.show()
-            plt.close()
-        elif args.fft:
-            fig,ax = plt.subplots(ncols=1)
-            Fs = self.record_MCU.sample_freq
-            plot_fft(ax,fig,Fs,s)
-            
-            plt.show()
-            plt.close()     
 
         val = input(f"Sure you want to upload? y/n: ")
 
