@@ -40,6 +40,7 @@ import threading
 import bb_gui
 import os
 from scipy import signal
+import time
 
 logging.basicConfig(level=logging.WARNING)
 plt.set_loglevel("error")
@@ -265,8 +266,8 @@ class bb_repl(Cmd):
 
     
     pinna_parser = Cmd2ArgumentParser()
-    pinna_parser.add_argument('motor_number',type=int)
-    pinna_parser.add_argument('motor_angle',type=int)
+    # pinna_parser.add_argument('motor_number',type=int)
+    # pinna_parser.add_argument('motor_angle',type=int)
     pinna_parser.add_argument('-g','--gui',action='store_true')
     pinna_parser.add_argument('-cal','--calibrate',action='store_true')
     @with_argparser(pinna_parser)
@@ -390,6 +391,9 @@ class bb_repl(Cmd):
                 raise
             if not self.emit_MCU.connection_status():
                 self.emit_MCU.connect_Serial(serial.Serial(port,baudrate=baud))
+                time.sleep(0.02)
+                if not self.emit_MCU.connection_status():
+                    raise
                 
             self.poutput(f"Emit MCU-UART: \t\tport:{port} \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:
@@ -404,6 +408,9 @@ class bb_repl(Cmd):
                 raise
             if not self.record_MCU.connection_status():
                 self.record_MCU.connect_Serial(serial.Serial(port,baudrate=baud))
+                time.sleep(0.02)
+                if not self.record_MCU.connection_status():
+                    raise
                 
             self.poutput(f"Record MCU-UART:\tport:{port} \t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:

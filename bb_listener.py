@@ -6,8 +6,26 @@ from serial import Serial
 import time
 import numpy as np
 import os
+from enum import Enum
 
-
+class LISTENER_SERIAL_CMD(Enum):
+    NONE = 0
+    START_LISTEN = 1
+    STOP_LISTEN = 2
+    ACK_REQ = 3
+    ACK = 4
+    ERROR = 100
+    
+class t_colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
     
 class EchoRecorder:
     
@@ -56,8 +74,64 @@ class EchoRecorder:
         self.teensy.baudrate = 480e6
         self.teensy.timeout = 0.3
     
-    def connection_status(self)->bool:
-        return self.teensy.is_open
+    def write_cmd(self,cmd:LISTENER_SERIAL_CMD)->None:
+        self.teensy.write(cmd.value)
+        
+    
+    def get_cmd(self)->LISTENER_SERIAL_CMD:
+        cmd = self.teensy.read()
+        if not cmd:
+            return None
+        
+        cmd = int.from_bytes(cmd,'little')
+        
+        if cmd == LISTENER_SERIAL_CMD.ACK.value:
+            return LISTENER_SERIAL_CMD.ACK
+        
+        elif cmd == LISTENER_SERIAL_CMD.ACK_REQ.value:
+            return LISTENER_SERIAL_CMD.ACK_REQ
+        
+        elif cmd ==LISTENER_SERIAL_CMD.START_LISTEN.value:
+            return LISTENER_SERIAL_CMD.START_LISTEN
+        
+        elif cmd == LISTENER_SERIAL_CMD.STOP_LISTEN.value:
+            return LISTENER_SERIAL_CMD.STOP_LISTEN
+        
+        elif cmd == LISTENER_SERIAL_CMD.ERROR.value:
+            return LISTENER_SERIAL_CMD.ERROR
+        
+        print(f"Unknown CMD {cmd}")
+        return LISTENER_SERIAL_CMD.ERROR
+    
+    def connection_status(self,print_:bool = False)->bool:
+        if not self.teensy.is_open:
+            if print_: print(f"{t_colors.FAIL}LISTENER NO SERIAL!{t_colors.ENDC}") 
+            try:
+                if self.teensy.portstr != None:
+                    self.teensy.open()
+                    if not self.teensy.is_open:
+                        return False
+                else:
+                    return False
+            except:
+                return False
+
+            
+        else:
+            self.teensy.close()
+            self.teensy.open()
+            
+        self.teensy.flush()
+        self.teensy.write([LISTENER_SERIAL_CMD.ACK_REQ.value])
+        back_val = self.get_cmd()
+
+        if back_val == LISTENER_SERIAL_CMD.ACK:
+            if print_: print(f"{t_colors.OKCYAN}LISTENER CONNECTED!{t_colors.ENDC}")
+            return True
+        
+
+        if print_: print(f"LISTENER NOT RESPONDING!{back_val}")
+        return False
         
     def listen(self, listen_time_ms:np.uint16)->tuple[np.uint16,np.uint16,np.uint16]:
         """Reads bytes from Teensy for given amount of listen time. This listen time
@@ -71,25 +145,37 @@ class EchoRecorder:
             tuple[np.uint16,np.uint16,np.uint16]: raw_data, left_ear, right_ear
         """
         
-        if not self.check_status():
-            print("ERROR NO ACK")
-            return
+        # if not self.check_status():
+        #     print("ERROR NO ACK")
+        #     return
+        if not self.connection_status():
+            print(f"EROR")
+            return None
+        
         
         listen_time_ms = listen_time_ms * 1e-3
         
         # ms * 1MS * 2 ears
         samples_to_read = int(listen_time_ms*self.sample_freq * 2)
-        
         read_times = int(samples_to_read/self.channel_burst_len)
 
             
         raw_bytes = bytearray()
-        self.teensy.flush()      
-        self.teensy.write(b'1')
+        # self.teensy.flush()      
+        # self.teensy.write(b'1')
+        # self.write_cmd(LISTENER_SERIAL_CMD.START_LISTEN)
+        self.teensy.write([LISTENER_SERIAL_CMD.START_LISTEN.value])
         for i in range(read_times):
             raw_bytes.extend(self.teensy.read(self.channel_burst_len*2))
-        self.teensy.write(b'0')
+        # self.teensy.write(b'0')
+        # self.teensy.close()
+        # self.write_cmd(LISTENER_SERIAL_CMD.STOP_LISTEN)
+        self.teensy.write([LISTENER_SERIAL_CMD.STOP_LISTEN.value])
+        self.teensy.flush()
         self.teensy.close()
+        self.teensy.open()
+        self.teensy.flush()
+        
         
             
         raw_data = np.frombuffer(raw_bytes,dtype=np.uint16)
@@ -100,8 +186,39 @@ class EchoRecorder:
         else:
             left_ear = raw_data[1::2]
             right_ear = raw_data[::2]
-            
         
+        # # send start listen cmd and time want to listen for
+        # self.teensy.write( [LISTENER_SERIAL_CMD.START_LISTEN.value,listen_time_ms&0xff,listen_time_ms>>8 & 0xff] )
+        
+        # # read back to see if it listened
+        # data = self.teensy.read(2)
+        # returned_listen_time = data[0] | data[1]<<8
+        
+        # if returned_listen_time != listen_time_ms:
+        #     print(f"ERROR RETURNED WRONG LEN {returned_listen_time}")
+        #     return False
+        
+        # # calculate number of bytes 
+        # samps_read=  int(listen_time_ms*1e-3*self.sample_freq*2)
+        # # times we need to read out channel bursts
+        # times_to_read = int(samps_read/self.channel_burst_len)
+        
+        
+        # raw_bytes = bytearray()
+        # for i in range(times_to_read):
+        #     raw_bytes.extend(self.teensy.read(self.channel_burst_len*2))
+        # self.write_cmd(LISTENER_SERIAL_CMD.STOP_LISTEN)
+        
+        # raw_data = np.frombuffer(raw_bytes,dtype=np.uint16)
+        
+        # if self.left_channel_first:
+        #     left_ear = raw_data[::2]
+        #     right_ear = raw_data[1::2]
+        # else:
+        #     left_ear = raw_data[1::2]
+        #     right_ear = raw_data[::2]
+            
+            
         return [raw_data,left_ear,right_ear]
 
         

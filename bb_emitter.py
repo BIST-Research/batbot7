@@ -86,16 +86,21 @@ class EchoEmitter:
             try:
                 if self.itsy.portstr != None:
                     self.itsy.open()
+                    if not self.itsy.is_open:
+                        return False
+                else:
+                    return False
             except:
-                pass
+                return False
+                
             
-            return
         else:
             self.itsy.close()
             self.itsy.open()
             
         
-        self.write_cmd(ECHO_SERIAL_CMD.ACK_REQ)
+        # self.write_cmd(ECHO_SERIAL_CMD.ACK_REQ)
+        self.itsy.write([ECHO_SERIAL_CMD.ACK_REQ.value])
         back_val = self.get_cmd()
 
         if back_val == ECHO_SERIAL_CMD.ACK:
