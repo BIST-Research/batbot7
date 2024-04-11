@@ -43,24 +43,88 @@ import time
 import math
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.colorbar import Colorbar
+import matplotlib.mlab as mlab
 plt.set_loglevel("error")
 import numpy as np
 from scipy import signal
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from datetime import datetime 
 import platform
 import qdarkstyle
-
+import pyqtgraph as pg
 import bb_listener
 import bb_emitter
+import threading
+
 
 # showing plots in qt from matlab
-class MplCanvas(FigureCanvasQTAgg):
+class MplCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
         super(MplCanvas, self).__init__(fig)
+        
+def remove_colorbars(fig):
+    # Iterate through each colorbar in the figure and remove it
+    for ax in fig.get_axes():
+    # Get the children of the axis
+        for child in ax.get_children():
+            # If the child is a colorbar, remove it
+            print(f"{type(child)}")
+            if isinstance(child, matplotlib.colorbar._ColorbarSpine):
+                child.remove()
+
+
+def plot_spec(ax:plt.axes, fig:plt.figure, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_title = 'spec',use_cb=True):
+    
+    fmin, fmax = fbounds
+    s, f, t = spec_tup
+    
+    lfc = (f >= fmin).argmax()
+    s = 20*np.log10(s)
+    f_cut = f[lfc:]
+    s_cut = s[:][lfc:]
+
+    
+    max_s = np.amax(s_cut)
+    s_cut = s_cut - max_s
+    
+    [rows_s, cols_s] = np.shape(s_cut)
+    
+    dB = -dB_range
+    
+    for col in range(cols_s):
+        for row in range(rows_s):
+            if s_cut[row][col] < dB:
+                s_cut[row][col] = dB
+                
+    cf = ax.pcolormesh(t, f_cut, s_cut, cmap='jet', shading='auto')
+    
+    if use_cb:
+        cbar = fig.colorbar(cf, ax=ax)
+        cbar.ax.set_ylabel('dB')
+    
+    ax.set_ylim(fmin, fmax)
+    ax.set_ylabel('Frequency (Hz)')
+    ax.set_xlabel('Time (sec)')
+    ax.title.set_text(plot_title)
+
+
+
+
+def process(raw, spec_settings, time_offs = 0):
+
+    unraw_balanced = raw - np.mean(raw)
+    
+    pt_cut = unraw_balanced[time_offs:]
+    remainder = unraw_balanced[:time_offs]
+    
+    Fs, NFFT, noverlap, window = spec_settings
+    spec_tup = mlab.specgram(pt_cut, Fs=Fs, NFFT=NFFT, noverlap=noverlap, window=window)
+    
+    return spec_tup, pt_cut, remainder
 
 
 # logging stuff
@@ -92,8 +156,18 @@ class BBGUI(QWidget):
     
     pinnae = PinnaeController(SpiDev(0,0))
     
+    try:
+        listener = bb_listener.EchoRecorder(serial.Serial('/dev/tty.usbmodem136132801',baudrate=460e6))
+        emitter = bb_emitter.EchoEmitter(serial.Serial('/dev/tty.usbmodem14201',baudrate=960e3))
+    except:
+        pass
+    
     instructionThread = None
     instructionThreadRunning = False
+    
+    left_pinna_plotted = False
+    right_pinna_plotted = False
+    
 
 
     def __init__(self,emitter:bb_emitter = None,listener:bb_listener=None, l_pinna:PinnaeController=None, r_pinna:PinnaeController=None):
@@ -193,7 +267,7 @@ class BBGUI(QWidget):
         self.chirp_start_freq_SB = QSpinBox()
         self.chirp_start_freq_SB.setSuffix(" kHz")
         self.chirp_start_freq_SB.setValue(50)
-        self.chirp_start_freq_SB.setRange(0,300)
+        self.chirp_start_freq_SB.setRange(0,100)
         self.chirp_start_freq_SB.valueChanged.connect(self.chirp_settings_changed_callback)
         chirp_grid.addWidget(QLabel("Start:"),0,0)
         chirp_grid.addWidget(self.chirp_start_freq_SB,0,1)
@@ -201,15 +275,16 @@ class BBGUI(QWidget):
         # end freq
         self.chirp_stop_freq_SB = QSpinBox()
         self.chirp_stop_freq_SB.setSuffix(" kHz")
-        self.chirp_stop_freq_SB.setRange(0,300)
-        self.chirp_stop_freq_SB.setValue(150)
+        self.chirp_stop_freq_SB.setRange(0,100)
+        self.chirp_stop_freq_SB.setValue(100)
         self.chirp_stop_freq_SB.valueChanged.connect(self.chirp_settings_changed_callback)
         chirp_grid.addWidget(QLabel("Stop:"),1,0)
         chirp_grid.addWidget(self.chirp_stop_freq_SB,1,1)
 
         # length of chirp
         self.chirp_duration_SB = QSpinBox()
-        self.chirp_duration_SB.setValue(1)
+        self.chirp_duration_SB.setValue(30)
+        self.chirp_duration_SB.setRange(1,65)
         self.chirp_duration_SB.setSuffix(" mS")
         self.chirp_duration_SB.valueChanged.connect(self.chirp_settings_changed_callback)
         chirp_grid.addWidget(QLabel("Duration:"),0,2)
@@ -250,6 +325,11 @@ class BBGUI(QWidget):
         self.upload_chirp_PB.clicked.connect(self.upload_chirp_PB_Clicked)
         chirp_grid.addWidget(self.upload_chirp_PB,1,6)
         
+        self.chirp_PB = QPushButton("CHIRP")
+        self.chirp_PB.clicked.connect(self.chirp_PB_Clicked)
+        chirp_grid.addWidget(self.chirp_PB,0,7)
+        
+        
         chirp_GB.setLayout(chirp_grid)
         
         
@@ -262,6 +342,9 @@ class BBGUI(QWidget):
         hLay.addWidget(chirp_GB)
         
         self.chirp_settings_changed_callback()
+        
+        # vlay = QVBoxLayout()
+        # vlay.addWidget(hLay)
         
         self.experiment_settings_GB.setLayout(hLay)
         self.mainVLay.addWidget(self.experiment_settings_GB)
@@ -417,8 +500,41 @@ class BBGUI(QWidget):
 
     def upload_chirp_PB_Clicked(self):
         """ when clicked"""
-        logging.debug("upload_chirp_PB_Clicked")
-        print(plt.get_figlabels())
+        fs = self.chirp_start_freq_SB.value()
+        fe = self.chirp_stop_freq_SB.value()
+        tend = self.chirp_duration_SB.value()
+        meth = self.chirp_type_CB.currentText()
+        s,t = self.emitter.gen_chirp(fs*1e3,fe*1e3,tend,method=meth)
+        self.emitter.upload_chirp(s)
+        
+    def chirp_PB_Clicked(self):
+        """ """
+        tim = threading.Timer(0.008, self.emitter.write_cmd, args=(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP,))
+        tim.start()
+        raw,L,R = self.listener.listen(100)
+        
+        Fs = 1e6
+        NFFT = 512
+        noverlap = 400
+        spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
+        DB_range = 40
+        f_plot_bounds = (30E3, 100E3)
+            
+        
+        spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
+        spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
+        self.leftPinnaeSpec.axes.cla()  # Clear the canva
+        plot_spec(self.leftPinnaeSpec.axes, self.leftPinnaeSpec.figure, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=not self.left_pinna_plotted)
+        self.leftPinnaeSpec.draw()
+        
+        self.rightPinnaeSpec.axes.cla()  # Clear the canvas.
+        plot_spec(self.rightPinnaeSpec.axes, self.rightPinnaeSpec.figure, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb= not self.right_pinna_plotted)
+        self.rightPinnaeSpec.draw()
+        
+        self.left_pinna_plotted = self.right_pinna_plotted = True
+    
+
+        
         
     def chirp_settings_changed_callback(self):
         open_figures = plt.get_figlabels()
@@ -1000,11 +1116,12 @@ class BBGUI(QWidget):
         hLay = QHBoxLayout()
         self.leftPinnaeSpec = MplCanvas(self,width=5,height=4,dpi=100)
         self.leftPinnaeSpec.axes.set_title("Left Pinna")
-        
         Time_difference = 0.0001
         Time_Array = np.linspace(0, 5, math.ceil(5 / Time_difference))
         Data = 20*(np.sin(3 * np.pi * Time_Array))
         self.leftPinnaeSpec.axes.specgram(Data,Fs=6,cmap="rainbow")
+
+        
         hLay.addWidget(self.leftPinnaeSpec)
 
         # ---------------------------------------------
@@ -1015,6 +1132,9 @@ class BBGUI(QWidget):
         Time_Array = np.linspace(0, 5, math.ceil(5 / Time_difference))
         Data = 20*(np.sin(3 * np.pi * Time_Array))
         self.rightPinnaeSpec.axes.specgram(Data,Fs=6,cmap="rainbow")
+
+        
+        
         hLay.addWidget(self.rightPinnaeSpec)
 
         vLay.addLayout(hLay)
@@ -1032,6 +1152,14 @@ class BBGUI(QWidget):
         
     def closeEvent(self,event):
         plt.close('all')
+        try:
+            self.listener.teensy.close()
+        except:
+            pass
+        try:
+            self.emitter.itsy.close()
+        except:
+            pass
         event.accept()
         
 class RunInstructionsThread(QThread):

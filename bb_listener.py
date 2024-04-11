@@ -145,9 +145,6 @@ class EchoRecorder:
             tuple[np.uint16,np.uint16,np.uint16]: raw_data, left_ear, right_ear
         """
         
-        # if not self.check_status():
-        #     print("ERROR NO ACK")
-        #     return
         if not self.connection_status():
             print(f"EROR")
             return None

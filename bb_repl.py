@@ -97,7 +97,7 @@ def gen_fft(data)->tuple[np.ndarray,np.ndarray]:
 
 
 
-def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_title = 'spec',use_khz=True):
+def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_title = 'spec',use_khz=False):
     
     fmin, fmax = fbounds
     s, f, t = spec_tup
@@ -122,18 +122,18 @@ def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_ti
                 
     cf = ax.pcolormesh(t, f_cut, s_cut, cmap='jet', shading='auto')
     cbar = fig.colorbar(cf, ax=ax)
+    cbar.ax.set_ylabel('dB')
     
     ax.set_ylim(fmin, fmax)
     ax.set_ylabel('Frequency (Hz)')
     ax.set_xlabel('Time (sec)')
     ax.title.set_text(plot_title)
 
-    cbar.ax.set_ylabel('dB')
     if use_khz:
         make_khz_ytick(ax)
  
             
-def plot_time(ax, fig,Fs,plot_data,use_ms=True)->None:
+def plot_time(ax, fig,Fs,plot_data,use_ms=False)->None:
     T = 1/Fs
     x_vals = np.linspace(0,len(plot_data)/Fs,num=len(plot_data))
     ax.plot(x_vals,plot_data,'o-',markersize=0.2)
@@ -150,7 +150,7 @@ def plot_fft(ax:plt.axes,fig:plt.figure,Fs,plot_data)->None:
     ax.set_xlabel('Frequency [Hz]')
     ax.set_ylabel('Magnitude')
     ax.set_xlim(0,Fs/2)
-    make_khz_xtick(ax)
+    # make_khz_xtick(ax)
 
 def make_khz_ytick(ax):
     # Get the current tick positions
@@ -240,7 +240,7 @@ class bb_repl(Cmd):
     
         
         self.do_status(None)
-        self.do_config('')
+
         
                 
     def do_batt(self, _:Statement) ->None: 
@@ -266,8 +266,6 @@ class bb_repl(Cmd):
 
     
     pinna_parser = Cmd2ArgumentParser()
-    # pinna_parser.add_argument('motor_number',type=int)
-    # pinna_parser.add_argument('motor_angle',type=int)
     pinna_parser.add_argument('-g','--gui',action='store_true')
     pinna_parser.add_argument('-cal','--calibrate',action='store_true')
     @with_argparser(pinna_parser)
@@ -380,8 +378,10 @@ class bb_repl(Cmd):
     def do_status(self,args)->None:
         """Generate workup on microcontroller status's
         """
-        self.poutput(f"\nBattery:\t\tNA, \t\t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
-        self.poutput(f"Body Temp:\t\tNA, \t\t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+        self.poutput(f"\nBattery:\t\tNA, \t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+        self.poutput(f"Body Temp:\t\tNA, \t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+        # self.poutput(f"\nBattery:\t\t11.8v, \t\t\t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+        # self.poutput(f"Body Temp:\t\t75f, \t\t\t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         
         baud = self.bb_config['emit_MCU']['baud']
         sn = self.bb_config['emit_MCU']['serial_num']
@@ -395,9 +395,9 @@ class bb_repl(Cmd):
                 if not self.emit_MCU.connection_status():
                     raise
                 
-            self.poutput(f"Emit MCU-UART: \t\tport:{port} \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+            self.poutput(f"Emit MCU-UART: \t\tport:{port} \t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:
-            self.poutput(f"Emit MCU-UART: \t\tport:{port} \t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+            self.poutput(f"Emit MCU-UART: \t\tport:{port} \t\t\t {t_colors.FAIL}FAIL {t_colors.ENDC}")
 
 
         baud = self.bb_config['record_MCU']['baud']
@@ -414,7 +414,7 @@ class bb_repl(Cmd):
                 
             self.poutput(f"Record MCU-UART:\tport:{port} \t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:
-            self.poutput(f"Record MCU-UART:\tport:{port} \t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+            self.poutput(f"Record MCU-UART:\tport:{port} \t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
      
      
         port = self.bb_config['gps_MCU']['port']
@@ -424,9 +424,9 @@ class bb_repl(Cmd):
             if not self.gps_MCU.connection_status():
                 raise
                 
-            self.poutput(f"GPS MCU-UART:\t\tport:{port} \t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+            self.poutput(f"GPS MCU-UART:\t\tport:{port} \t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         except:
-            self.poutput(f"GPS MCU-UART:\t\tport:{port} \t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+            self.poutput(f"GPS MCU-UART:\t\tport:{port} \t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
         
         
         bus = self.bb_config['left_pinnae_MCU']['bus']
@@ -437,9 +437,10 @@ class bb_repl(Cmd):
             
             if not self.L_pinna_MCU.get_ack():
                 raise
-            self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
+            
+            self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
         except:
-            self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
+            self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
 
         bus = self.bb_config['right_pinnae_MCU']['bus']
         ss = self.bb_config['right_pinnae_MCU']['ss']
@@ -449,12 +450,13 @@ class bb_repl(Cmd):
             
             if not self.R_pinna_MCU.get_ack():
                 raise
-            self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
+            
+            self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
         except:
-            self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
+            self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
             
         
-        self.poutput(f"{t_colors.FAIL}\t LIMITED CAPABILITIES{t_colors.ENDC}")
+        # self.poutput(f"{t_colors.FAIL}\t LIMITED CAPABILITIES{t_colors.ENDC}")
         
         
         
@@ -466,6 +468,8 @@ class bb_repl(Cmd):
     listen_parser.add_argument('-fft','--fft',action='store_true',help="Plot the fft")
     listen_parser.add_argument('-spec','--spec',action='store_true',help="Plot the spec")
     listen_parser.add_argument('-of','--off',type=float,help="offset to start listening",default=0.008)
+    listen_parser.add_argument('-nc','--num_chirps',type=int,help='times to chirp',default=1)
+    listen_parser.add_argument('-cs','--chirp_spacing',type=int,help='space between chirps',default=20)
     @with_argparser(listen_parser)
     def do_listen(self,args):
         """Listen for echos 
@@ -602,25 +606,29 @@ class bb_repl(Cmd):
 
 
     upload_chirp_parser = Cmd2ArgumentParser()
-    upload_chirp_parser.add_argument('-f0','--freq0',help='start freq',required=True,type=str)
-    upload_chirp_parser.add_argument('-f1','--freq1',help='end freq',required=True,type=str)
+    upload_chirp_parser.add_argument('-f0','--freq0',help='start freq',type=str)
+    upload_chirp_parser.add_argument('-f1','--freq1',help='end freq',type=str)
     upload_chirp_parser.add_argument('-t','--time',help='Time in ms to chirp, max is 60ms',type=int,default=30)
     upload_chirp_parser.add_argument('-g','--gain',help='gain to boost signal for DAC',type=int,default=512)
     upload_chirp_parser.add_argument('-m','--method',help='linear, quadratic..',type=str,default='linear')
     upload_chirp_parser.add_argument('-p','--plot',help='Preview',action='store_true')
     upload_chirp_parser.add_argument('-fft','--fft',help='Preview',action='store_true')
     upload_chirp_parser.add_argument('-spec','--spec',help='Preview',action='store_true')
+    upload_chirp_parser.add_argument('-cf','--file',help='file to use')
     @with_argparser(upload_chirp_parser)
     def do_upload_chirp(self,args):
-        freq0 = convert_khz(args.freq0)
-        if freq0 is None:
-            self.perror("-f0 should be xk")
-        freq1 = convert_khz(args.freq1)
-        if freq1 is None:
-            self.perror("-f1 should be xk")
-
-        [s,t] = self.emit_MCU.gen_chirp(freq0,freq1,args.time,args.method,args.gain)
-
+        
+        if not args.file:
+            freq0 = convert_khz(args.freq0)
+            if freq0 is None:
+                self.perror("-f0 should be xk")
+            freq1 = convert_khz(args.freq1)
+            if freq1 is None:
+                self.perror("-f1 should be xk")
+                
+            [s,t] = self.emit_MCU.gen_chirp(freq0,freq1,args.time,args.method,args.gain)
+        else:
+            s = self.emit_MCU.get_and_convert_numpy(args.file)
          
         num_axes = 0
         rows = 0
@@ -676,6 +684,68 @@ class bb_repl(Cmd):
 
         self.emit_MCU.upload_chirp(data=s)
     
+    upload_parser = Cmd2ArgumentParser()
+    upload_parser.add_argument('file',help='file to upload')
+    upload_parser.add_argument('-fft','--fft',action='store_true')
+    upload_parser.add_argument('-p','--plot',action='store_true')
+    upload_parser.add_argument('-spec','--spec',action='store_true')
+    @with_argparser(upload_parser)
+    def do_upload(self,args):
+        if not args.file:
+            self.perror(f"Expected file_name")
+        s = self.emit_MCU.get_and_convert_numpy(args.file)
+         
+        num_axes = 0
+        rows = 0
+        if args.plot:
+            rows +=1 
+        if args.fft:
+            rows +=1
+        if args.spec:
+            rows +=1
+        if rows > 0:
+            fig,axes = plt.subplots(nrows=rows)
+        Fs = self.record_MCU.sample_freq
+        cur_row = 0
+        if args.plot:
+            if rows > 1:
+                plot_time(axes[cur_row],fig,Fs,s)
+            else:
+                plot_time(axes,fig,Fs,s)
+            cur_row += 1
+        if args.fft:
+            if rows >1:
+                plot_fft(axes[cur_row],fig,Fs,s)
+            else:
+                plot_fft(axes,fig,Fs,s)
+                
+            cur_row += 1
+        if args.spec:
+            NFFT = 512
+            noverlap = 400
+            spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
+            DB_range = 40
+            f_plot_bounds = (30E3, 100E3)
+            
+            spec_tup1, pt_cut1, pt1 = process(s, spec_settings, time_offs=0)
+            if rows> 1:
+                plot_spec(axes[cur_row], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Spec')
+            else:
+                plot_spec(axes, fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Spec')
+                
+        if rows > 0:
+            plt.subplots_adjust(wspace=0.5,hspace=0.8)
+            plt.show()
+            plt.close()
+            
+        while True:
+            if val.lower() == 'y':
+                break
+            elif val.lower() == 'n':
+                return
+            val = input(f"y/n: ")
+
+        self.emit_MCU.upload_chirp(data=s)
 
     def do_chirp(self,args):
         # self.emit_MCU.chirp()
