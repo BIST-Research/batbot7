@@ -21,8 +21,6 @@ from cmd2 import (
 
 )
 import sys
-import argparse
-import struct
 import pinnae
 import numpy as np
 import bb_listener
@@ -43,6 +41,7 @@ from scipy import signal
 import time
 import queue
 import multiprocessing as mp
+from serial_helper import get_port_from_serial_num
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -62,20 +61,6 @@ class t_colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-def get_serial_port_from_serial_number(serial_str:str)->str:
-    """Given a serial_number, function will look for open serial ports
-
-
-    Args:
-        serial_str (str): serial number of device
-
-    Returns:
-        str: COMx of device
-    """
-    for port in serial.tools.list_ports.comports():
-        if serial_str == port.serial_number:
-            return port.device
-    return None
     
 
 def convert_khz(hz_str:str)->float:
@@ -415,7 +400,7 @@ class bb_repl(Cmd):
         
         baud = self.bb_config['emit_MCU']['baud']
         sn = self.bb_config['emit_MCU']['serial_num']
-        port = get_serial_port_from_serial_number(sn)
+        port = get_port_from_serial_num(sn)
         try:
             if port is None:
                 raise
@@ -432,7 +417,7 @@ class bb_repl(Cmd):
 
         baud = self.bb_config['record_MCU']['baud']
         sn = self.bb_config['record_MCU']['serial_num']
-        port = get_serial_port_from_serial_number(sn)
+        port = get_port_from_serial_num(sn)
         try:
             if port is None:
                 raise
@@ -614,7 +599,7 @@ class bb_repl(Cmd):
                 plot_spec(axes[1], fig, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear',plot_db=show_db)
                 show_db = False
                 plt.draw()
-                plt.pause(0.0001)
+                plt.pause(0.001)
                 # plot_q.put([L,R])
 
             

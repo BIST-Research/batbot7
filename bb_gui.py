@@ -41,6 +41,7 @@ import serial
 import serial.tools.list_ports
 import time
 import math
+import yaml
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colorbar import Colorbar
@@ -57,6 +58,7 @@ import pyqtgraph as pg
 import bb_listener
 import bb_emitter
 import threading
+from serial_helper import get_port_from_serial_num
 
 
 # showing plots in qt from matlab
@@ -108,6 +110,9 @@ def plot_spec(ax:plt.axes, fig:plt.figure, spec_tup, fbounds = (30E3, 100E3), dB
     
     ax.set_ylim(fmin, fmax)
     ax.set_ylabel('Frequency (Hz)')
+    ytick_labels = [f'{int(val)} kHz' for val in ax.get_yticks()/1000]
+    ax.set_yticks(ax.get_yticks())
+    ax.set_yticklabels(ytick_labels)
     ax.set_xlabel('Time (sec)')
     ax.title.set_text(plot_title)
 
@@ -151,16 +156,15 @@ class BBGUI(QWidget):
     # main vertical layout everything is added to
     mainVLay = QVBoxLayout()
     
+
     # find your serial port and paste into here
     # pinnae = PinnaeController(serial_dev=serial.Serial("/dev/tty.usbmodem14301",baudrate=115200))
     
+    
     pinnae = PinnaeController(SpiDev(0,0))
     
-    try:
-        emitter = bb_emitter.EchoEmitter(serial.Serial('/dev/tty.usbmodem14101',baudrate=960e3))
-        listener = bb_listener.EchoRecorder(serial.Serial('/dev/tty.usbmodem136132801',baudrate=460e6))
-    except:        pass
-    
+
+
     instructionThread = None
     instructionThreadRunning = False
     
@@ -186,6 +190,26 @@ class BBGUI(QWidget):
         # self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
         
         self.setLayout(self.mainVLay)
+    
+        with open('bb_conf.yaml',"r") as f:
+            self.bb_config = yaml.safe_load(f)
+
+        baud = self.bb_config['emit_MCU']['baud']
+        sn = self.bb_config['emit_MCU']['serial_num']
+        port = get_port_from_serial_num(sn)
+        try:
+            self.emitter = bb_emitter.EchoEmitter(serial.Serial(port=port,baudrate=baud))
+        except:        
+            pass
+
+        baud = self.bb_config['record_MCU']['baud']
+        sn = self.bb_config['record_MCU']['serial_num']
+        port = get_port_from_serial_num(sn)
+
+        try:
+            self.listener = bb_listener.EchoRecorder(serial.Serial(port=port,baudrate=baud))
+        except:
+            pass
         
 
 #----------------------------------------------------------------------
@@ -508,9 +532,7 @@ class BBGUI(QWidget):
         
     def chirp_PB_Clicked(self):
         """ """
-        # tim = threading.Timer(0.008, self.emitter.write_cmd, args=(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP,))
-        # tim.start()
-        # self.emitter.write_cmd(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP)
+
         count = 0
         
         Fs = 1e6
@@ -533,10 +555,12 @@ class BBGUI(QWidget):
                 self.leftPinnaeSpec.axes.cla()  # Clear the canva
                 plot_spec(self.leftPinnaeSpec.axes, self.leftPinnaeSpec.figure, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=not self.left_pinna_plotted)
                 self.leftPinnaeSpec.draw()
+                self.leftPinnaeSpec.figure.tight_layout()
                 
                 self.rightPinnaeSpec.axes.cla()  # Clear the canvas.
                 plot_spec(self.rightPinnaeSpec.axes, self.rightPinnaeSpec.figure, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb= not self.right_pinna_plotted)
                 self.rightPinnaeSpec.draw()
+                self.rightPinnaeSpec.figure.tight_layout()
                 
                 # self.echo_GB.update()
                 self.left_pinna_plotted = self.right_pinna_plotted = True
