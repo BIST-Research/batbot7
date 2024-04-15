@@ -109,10 +109,12 @@ def plot_spec(ax:plt.axes, fig:plt.figure, spec_tup, fbounds = (30E3, 100E3), dB
         cbar.ax.set_ylabel('dB')
     
     ax.set_ylim(fmin, fmax)
+    ax.set_yticks(range(30000, 100000 + 1, 10000))
     ax.set_ylabel('Frequency (Hz)')
     ytick_labels = [f'{int(val)} kHz' for val in ax.get_yticks()/1000]
     ax.set_yticks(ax.get_yticks())
     ax.set_yticklabels(ytick_labels)
+    ax.set_ylim(fmin, fmax)
     ax.set_xlabel('Time (sec)')
     ax.title.set_text(plot_title)
 
@@ -157,12 +159,10 @@ class BBGUI(QWidget):
     mainVLay = QVBoxLayout()
     
 
-    # find your serial port and paste into here
-    # pinnae = PinnaeController(serial_dev=serial.Serial("/dev/tty.usbmodem14301",baudrate=115200))
-    
     
     pinnae = PinnaeController(SpiDev(0,0))
-    
+    emitter = bb_emitter.EchoEmitter()
+    listener = bb_listener.EchoRecorder()
 
 
     instructionThread = None
@@ -306,7 +306,7 @@ class BBGUI(QWidget):
 
         # length of chirp
         self.chirp_duration_SB = QSpinBox()
-        self.chirp_duration_SB.setValue(30)
+        self.chirp_duration_SB.setValue(3)
         self.chirp_duration_SB.setRange(1,65)
         self.chirp_duration_SB.setSuffix(" mS")
         self.chirp_duration_SB.valueChanged.connect(self.chirp_settings_changed_callback)
@@ -328,15 +328,11 @@ class BBGUI(QWidget):
         self.chirp_buffer_length_SB = QLineEdit()
         self.chirp_buffer_length_SB.setReadOnly(True)
         self.chirp_buffer_length_SB.setMaximumWidth(buffer_col_len)
-        # chirp_grid.addWidget(QLabel("Chirp:"),0,4)
-        # chirp_grid.addWidget(self.chirp_buffer_length_SB,0,5)
         
         # lengthf of listen buffers
         self.listen_buffer_length_SB = QLineEdit()
         self.listen_buffer_length_SB.setReadOnly(True)
         self.listen_buffer_length_SB.setMaximumWidth(buffer_col_len)
-        # chirp_grid.addWidget(QLabel("Listen:"),1,4)
-        # chirp_grid.addWidget(self.listen_buffer_length_SB,1,5)
         
         # preview chirp
         self.preview_chirp_PB = QPushButton("Preview")
@@ -555,6 +551,7 @@ class BBGUI(QWidget):
                 self.leftPinnaeSpec.axes.cla()  # Clear the canva
                 plot_spec(self.leftPinnaeSpec.axes, self.leftPinnaeSpec.figure, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=not self.left_pinna_plotted)
                 self.leftPinnaeSpec.draw()
+                self.leftPinnaeSpec.axes.set_ybound(30e3,100e3)
                 self.leftPinnaeSpec.figure.tight_layout()
                 
                 self.rightPinnaeSpec.axes.cla()  # Clear the canvas.
