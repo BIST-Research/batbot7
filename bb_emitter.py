@@ -73,6 +73,8 @@ class EchoEmitter:
         
         self.SIG_GAIN = 512
         self.SIG_OFFSET = 2048
+        
+        self.EMIT_TIME = 0
     
     def connect_Serial(self,serial:Serial):
         self.itsy = serial
@@ -248,6 +250,7 @@ class EchoEmitter:
             return False
         
         self.chirp_uploaded = True
+        self.EMIT_TIME = data_len
 
 
     def get_max_chirp_uint16_length(self) -> np.uint16:

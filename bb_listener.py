@@ -158,23 +158,16 @@ class EchoRecorder:
 
             
         raw_bytes = bytearray()
-        # self.teensy.flush()      
-        # self.teensy.write(b'1')
-        # self.write_cmd(LISTENER_SERIAL_CMD.START_LISTEN)
         self.teensy.write([LISTENER_SERIAL_CMD.START_LISTEN.value])
         for i in range(read_times):
             raw_bytes.extend(self.teensy.read(self.channel_burst_len*2))
-        # self.teensy.write(b'0')
-        # self.teensy.close()
-        # self.write_cmd(LISTENER_SERIAL_CMD.STOP_LISTEN)
+
         self.teensy.write([LISTENER_SERIAL_CMD.STOP_LISTEN.value])
         self.teensy.flush()
         self.teensy.close()
         self.teensy.open()
         self.teensy.flush()
         
-        
-            
         raw_data = np.frombuffer(raw_bytes,dtype=np.uint16)
 
         if self.left_channel_first:
@@ -183,40 +176,9 @@ class EchoRecorder:
         else:
             left_ear = raw_data[1::2]
             right_ear = raw_data[::2]
-        
-        # # send start listen cmd and time want to listen for
-        # self.teensy.write( [LISTENER_SERIAL_CMD.START_LISTEN.value,listen_time_ms&0xff,listen_time_ms>>8 & 0xff] )
-        
-        # # read back to see if it listened
-        # data = self.teensy.read(2)
-        # returned_listen_time = data[0] | data[1]<<8
-        
-        # if returned_listen_time != listen_time_ms:
-        #     print(f"ERROR RETURNED WRONG LEN {returned_listen_time}")
-        #     return False
-        
-        # # calculate number of bytes 
-        # samps_read=  int(listen_time_ms*1e-3*self.sample_freq*2)
-        # # times we need to read out channel bursts
-        # times_to_read = int(samps_read/self.channel_burst_len)
-        
-        
-        # raw_bytes = bytearray()
-        # for i in range(times_to_read):
-        #     raw_bytes.extend(self.teensy.read(self.channel_burst_len*2))
-        # self.write_cmd(LISTENER_SERIAL_CMD.STOP_LISTEN)
-        
-        # raw_data = np.frombuffer(raw_bytes,dtype=np.uint16)
-        
-        # if self.left_channel_first:
-        #     left_ear = raw_data[::2]
-        #     right_ear = raw_data[1::2]
-        # else:
-        #     left_ear = raw_data[1::2]
-        #     right_ear = raw_data[::2]
+
             
-            
-        return [raw_data,left_ear,right_ear]
+        return [raw_bytes,left_ear,right_ear]
 
         
         

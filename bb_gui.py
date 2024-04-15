@@ -157,10 +157,9 @@ class BBGUI(QWidget):
     pinnae = PinnaeController(SpiDev(0,0))
     
     try:
+        emitter = bb_emitter.EchoEmitter(serial.Serial('/dev/tty.usbmodem14101',baudrate=960e3))
         listener = bb_listener.EchoRecorder(serial.Serial('/dev/tty.usbmodem136132801',baudrate=460e6))
-        emitter = bb_emitter.EchoEmitter(serial.Serial('/dev/tty.usbmodem14201',baudrate=960e3))
-    except:
-        pass
+    except:        pass
     
     instructionThread = None
     instructionThreadRunning = False
@@ -184,7 +183,7 @@ class BBGUI(QWidget):
         # add pinnae controls layout
         self.Add_Pinnae_Control_GB()
 
-        self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
+        # self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
         
         self.setLayout(self.mainVLay)
         
@@ -509,9 +508,10 @@ class BBGUI(QWidget):
         
     def chirp_PB_Clicked(self):
         """ """
-        tim = threading.Timer(0.008, self.emitter.write_cmd, args=(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP,))
-        tim.start()
-        raw,L,R = self.listener.listen(100)
+        # tim = threading.Timer(0.008, self.emitter.write_cmd, args=(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP,))
+        # tim.start()
+        # self.emitter.write_cmd(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP)
+        count = 0
         
         Fs = 1e6
         NFFT = 512
@@ -519,19 +519,32 @@ class BBGUI(QWidget):
         spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
         DB_range = 40
         f_plot_bounds = (30E3, 100E3)
+        
+
+        while True:
+            raw,L,R = self.listener.listen(30)
             
-        
-        spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
-        spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
-        self.leftPinnaeSpec.axes.cla()  # Clear the canva
-        plot_spec(self.leftPinnaeSpec.axes, self.leftPinnaeSpec.figure, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=not self.left_pinna_plotted)
-        self.leftPinnaeSpec.draw()
-        
-        self.rightPinnaeSpec.axes.cla()  # Clear the canvas.
-        plot_spec(self.rightPinnaeSpec.axes, self.rightPinnaeSpec.figure, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb= not self.right_pinna_plotted)
-        self.rightPinnaeSpec.draw()
-        
-        self.left_pinna_plotted = self.right_pinna_plotted = True
+            
+            
+            
+            if count % 2== 0:
+                spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
+                spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
+                self.leftPinnaeSpec.axes.cla()  # Clear the canva
+                plot_spec(self.leftPinnaeSpec.axes, self.leftPinnaeSpec.figure, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=not self.left_pinna_plotted)
+                self.leftPinnaeSpec.draw()
+                
+                self.rightPinnaeSpec.axes.cla()  # Clear the canvas.
+                plot_spec(self.rightPinnaeSpec.axes, self.rightPinnaeSpec.figure, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb= not self.right_pinna_plotted)
+                self.rightPinnaeSpec.draw()
+                
+                # self.echo_GB.update()
+                self.left_pinna_plotted = self.right_pinna_plotted = True
+                QApplication.processEvents()
+            
+            if count >= 30:
+                break
+            count +=1
     
 
         

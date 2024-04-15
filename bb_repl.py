@@ -41,6 +41,9 @@ import bb_gui
 import os
 from scipy import signal
 import time
+import queue
+import multiprocessing as mp
+
 
 logging.basicConfig(level=logging.WARNING)
 plt.set_loglevel("error")
@@ -97,7 +100,7 @@ def gen_fft(data)->tuple[np.ndarray,np.ndarray]:
 
 
 
-def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_title = 'spec',use_khz=False):
+def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_title = 'spec',plot_db=False):
     
     fmin, fmax = fbounds
     s, f, t = spec_tup
@@ -121,16 +124,16 @@ def plot_spec(ax, fig, spec_tup, fbounds = (30E3, 100E3), dB_range = 40, plot_ti
                 s_cut[row][col] = dB
                 
     cf = ax.pcolormesh(t, f_cut, s_cut, cmap='jet', shading='auto')
-    cbar = fig.colorbar(cf, ax=ax)
-    cbar.ax.set_ylabel('dB')
+    if plot_db:
+        cbar = fig.colorbar(cf, ax=ax)
+        cbar.ax.set_ylabel('dB')
     
     ax.set_ylim(fmin, fmax)
     ax.set_ylabel('Frequency (Hz)')
     ax.set_xlabel('Time (sec)')
     ax.title.set_text(plot_title)
 
-    if use_khz:
-        make_khz_ytick(ax)
+
  
             
 def plot_time(ax, fig,Fs,plot_data,use_ms=False)->None:
@@ -200,7 +203,34 @@ def process(raw, spec_settings, time_offs = 0):
             
 
 
-
+def plot_thread_function(plot_data:mp.Queue)->None:
+    
+    Fs = 1e6
+    NFFT = 512
+    noverlap = 400
+    spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
+    DB_range = 40
+    f_plot_bounds = (30E3, 100E3)
+    
+    fig,axes = plt.subplots(nrows=2,ncols=1)
+    plt.ion()
+    plt.show()
+        
+    while True:    
+        while plot_data.empty:# and not should_stop.is_set():
+            data = plot_data.get()
+            L,R = data
+        
+        # if should_stop.is_set():
+        #     return    
+        
+        spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
+        spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
+        plot_spec(axes[0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=False)
+        plot_spec(axes[0], fig, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=False)
+        plt.draw()
+        plt.pause(0.0001)
+        
 
 
 
@@ -470,6 +500,7 @@ class bb_repl(Cmd):
     listen_parser.add_argument('-of','--off',type=float,help="offset to start listening",default=0.008)
     listen_parser.add_argument('-nc','--num_chirps',type=int,help='times to chirp',default=1)
     listen_parser.add_argument('-cs','--chirp_spacing',type=int,help='space between chirps',default=20)
+    listen_parser.add_argument('-to','--time_off',type=int,default=0)
     @with_argparser(listen_parser)
     def do_listen(self,args):
         """Listen for echos 
@@ -477,11 +508,10 @@ class bb_repl(Cmd):
         Args:
             args (_type_): _description_
         """
-        
-        tim = threading.Timer(args.off, self.emit_MCU.write_cmd, args=(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP,))
-        tim.start()
 
         _,L,R = self.record_MCU.listen(args.listen_time_ms)
+        
+        
         
         num_axes = 0
         rows = 0
@@ -520,8 +550,8 @@ class bb_repl(Cmd):
             DB_range = 40
             f_plot_bounds = (30E3, 100E3)
             
-            spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
-            spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
+            spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=args.time_off)
+            spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=args.time_off)
             
             if rows > 1:
                 plot_spec(axes[cur_row,0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear')
@@ -534,7 +564,67 @@ class bb_repl(Cmd):
             plt.subplots_adjust(wspace=0.5,hspace=0.8)
             plt.show()
             plt.close()
+            
+            
+    run_parser = Cmd2ArgumentParser()
+    run_parser.add_argument('-lt','--listen_time_ms',type=int,help="Time to listen for in ms",default=30)
+    run_parser.add_argument('-p','--plot',action='store_true',help="Plot the results")
+    run_parser.add_argument('-fft','--fft',action='store_true',help="Plot the fft")
+    run_parser.add_argument('-spec','--spec',action='store_true',help="Plot the spec")
+    run_parser.add_argument('-nc','--num_chirps',type=int,help='times to chirp',default=30)
+    run_parser.add_argument('-to','--time_off',type=int,default=0)
+    # run_parser.add_argument('chirp_file',required=False)
+    @with_argparser(run_parser)
+    def do_run(self,args):
+        """Listen for echos 
+
+        Args:
+            args (_type_): _description_
+        """
+        # plot_q = mp.Queue()
+        # plot_stop = mp.Event()
+
+        # plot_p = mp.Process(target=plot_thread_function,args=(plot_q,))
+        # plot_p.start()
         
+        fig, axes = plt.subplots(nrows=2, figsize=(9,7))
+        plt.subplots_adjust(left=0.1,
+		            bottom=0.1,
+		            right=0.9,
+		            top=0.9,
+		            wspace=0.4,
+		            hspace=0.4)
+
+        Fs = 1e6
+        count = 0
+        NFFT = 512
+        noverlap = 400
+        spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
+        DB_range = 40
+        f_plot_bounds = (30E3, 100E3)
+        
+        show_db = True
+        while True:
+            _,L,R = self.record_MCU.listen(args.listen_time_ms)
+
+            if count % 5 == 0:
+                spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
+                spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
+                plot_spec(axes[0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',plot_db=show_db)
+                plot_spec(axes[1], fig, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear',plot_db=show_db)
+                show_db = False
+                plt.draw()
+                plt.pause(0.0001)
+                # plot_q.put([L,R])
+
+            
+            if count >= args.num_chirps:
+                break
+            
+            count+=1
+        
+        
+    
             
 
     upload_sine_parser = Cmd2ArgumentParser()
@@ -750,6 +840,22 @@ class bb_repl(Cmd):
     def do_chirp(self,args):
         # self.emit_MCU.chirp()
         self.emit_MCU.write_cmd(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP)
+        
+        
+    def do_quit(self,args):
+        try:
+            self.emit_MCU.itsy.close()
+            self.emit_MCU.itsy = None
+        except:
+            
+            pass
+        try:
+            self.record_MCU.teensy.close()
+        except:
+            pass
+        
+        
+        return True
             
 if __name__ == '__main__':
     bb = bb_repl()
