@@ -61,8 +61,8 @@ class PinnaeController:
         else:
             self.com_type = COM_TYPE.NONE
     
-    def config_uart(self,serial_str:str)->None:
-        self.serial = Serial(port=serial_str,baudrate=115200)
+    def config_uart(self,serial_obj:Serial)->None:
+        self.serial = serial_obj
         self.com_type = COM_TYPE.UART
         logging.debug("Using UART NOW!")
         
