@@ -61,7 +61,13 @@ class t_colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-    
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    return signal.butter(order, [lowcut, highcut], fs=fs, btype='band')
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = signal.lfilter(b, a, data)
+    return y
 
 def convert_khz(hz_str:str)->float:
     freqstr = hz_str.lower()
@@ -496,6 +502,8 @@ class bb_repl(Cmd):
 
         _,L,R = self.record_MCU.listen(args.listen_time_ms)
         
+        L = butter_bandpass_filter(L,30e3,100e3,fs=1e6)
+        R = butter_bandpass_filter(R,30e3,100e3,fs=1e6)
         
         
         num_axes = 0

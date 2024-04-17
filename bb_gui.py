@@ -354,12 +354,19 @@ class BBGUI(QWidget):
         self.times_to_chirp_SB = QSpinBox()
         self.times_to_chirp_SB.setSuffix(' chirps')
         self.times_to_chirp_SB.setRange(1,2000)
+        self.times_to_chirp_SB.setValue(30)
         chirp_grid.addWidget(self.times_to_chirp_SB,0,7)
         
         self.time_to_listen_SB = QSpinBox()
-        self.time_to_listen_SB.setSuffix(' listens')
+        self.time_to_listen_SB.setSuffix(' ms')
         self.time_to_listen_SB.setRange(1,30000)
+        self.time_to_listen_SB.setValue(30)
         chirp_grid.addWidget(self.time_to_listen_SB,1,7)
+        
+        self.time_off_SB = QSpinBox()
+        self.time_off_SB.setRange(0,1000000)
+        self.time_off_SB.setValue(3000)
+        chirp_grid.addWidget(self.time_off_SB,0,8)
         
         
         chirp_GB.setLayout(chirp_grid)
@@ -590,17 +597,18 @@ class BBGUI(QWidget):
         
         listen_time = self.time_to_listen_SB.value()
         times_to_chirp = self.times_to_chirp_SB.value()
+        time_off = self.time_off_SB.value()
         
 
         while True:
-            raw,L,R = self.listener.listen(30)
+            raw,L,R = self.listener.listen(listen_time)
             
             
             
             
             if count % 2== 0:
-                spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
-                spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
+                spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=time_off)
+                spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=time_off)
                 self.leftPinnaeSpec.axes.cla()  # Clear the canva
                 plot_spec(self.leftPinnaeSpec.axes, self.leftPinnaeSpec.figure, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=not self.left_pinna_plotted)
                 self.leftPinnaeSpec.draw()
@@ -616,7 +624,7 @@ class BBGUI(QWidget):
                 self.left_pinna_plotted = self.right_pinna_plotted = True
                 QApplication.processEvents()
             
-            if count >= 30:
+            if count >= times_to_chirp:
                 break
             count +=1
     
