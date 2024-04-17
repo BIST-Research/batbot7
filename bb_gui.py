@@ -261,7 +261,7 @@ class BBGUI(QWidget):
 
         self.right_pinna_spi_ss_SB = QSpinBox()
         self.right_pinna_spi_ss_SB.setPrefix("SS: ")
-        self.right_pinna_spi_ss_SB.setValue(0)
+        self.right_pinna_spi_ss_SB.setValue(1)
         self.right_pinna_spi_bus_SB = QSpinBox()
         self.right_pinna_spi_bus_SB.setPrefix("BUS: ")
         self.right_pinna_spi_bus_SB.setValue(0)
@@ -313,7 +313,6 @@ class BBGUI(QWidget):
         self.chirp_start_freq_SB.setSuffix(" kHz")
         self.chirp_start_freq_SB.setValue(50)
         self.chirp_start_freq_SB.setRange(0,100)
-        self.chirp_start_freq_SB.valueChanged.connect(self.chirp_settings_changed_callback)
         chirp_grid.addWidget(QLabel("Start:"),0,0)
         chirp_grid.addWidget(self.chirp_start_freq_SB,0,1)
 
@@ -322,7 +321,6 @@ class BBGUI(QWidget):
         self.chirp_stop_freq_SB.setSuffix(" kHz")
         self.chirp_stop_freq_SB.setRange(0,100)
         self.chirp_stop_freq_SB.setValue(100)
-        self.chirp_stop_freq_SB.valueChanged.connect(self.chirp_settings_changed_callback)
         chirp_grid.addWidget(QLabel("Stop:"),1,0)
         chirp_grid.addWidget(self.chirp_stop_freq_SB,1,1)
 
@@ -331,7 +329,6 @@ class BBGUI(QWidget):
         self.chirp_duration_SB.setValue(3)
         self.chirp_duration_SB.setRange(1,65)
         self.chirp_duration_SB.setSuffix(" mS")
-        self.chirp_duration_SB.valueChanged.connect(self.chirp_settings_changed_callback)
         chirp_grid.addWidget(QLabel("Duration:"),0,2)
         chirp_grid.addWidget(self.chirp_duration_SB,0,3)
         
@@ -341,34 +338,28 @@ class BBGUI(QWidget):
         self.chirp_type_CB.addItem('quadratic')
         self.chirp_type_CB.addItem('logarithmic')
         self.chirp_type_CB.addItem('hyperbolic')
-        self.chirp_type_CB.currentTextChanged.connect(self.chirp_settings_changed_callback)
         chirp_grid.addWidget(QLabel("Type:"),1,2)
         chirp_grid.addWidget(self.chirp_type_CB,1,3)
         
-        buffer_col_len = 90
-        # length of chirp buffer
-        self.chirp_buffer_length_SB = QLineEdit()
-        self.chirp_buffer_length_SB.setReadOnly(True)
-        self.chirp_buffer_length_SB.setMaximumWidth(buffer_col_len)
-        
-        # lengthf of listen buffers
-        self.listen_buffer_length_SB = QLineEdit()
-        self.listen_buffer_length_SB.setReadOnly(True)
-        self.listen_buffer_length_SB.setMaximumWidth(buffer_col_len)
-        
-        # preview chirp
-        self.preview_chirp_PB = QPushButton("Preview")
-        self.preview_chirp_PB.clicked.connect(self.preview_chirp_PB_Clicked)
-        chirp_grid.addWidget(self.preview_chirp_PB,0,6)
         
         # upload to board
         self.upload_chirp_PB = QPushButton("Upload")
         self.upload_chirp_PB.clicked.connect(self.upload_chirp_PB_Clicked)
-        chirp_grid.addWidget(self.upload_chirp_PB,1,6)
+        chirp_grid.addWidget(self.upload_chirp_PB,0,6)
         
         self.chirp_PB = QPushButton("CHIRP")
         self.chirp_PB.clicked.connect(self.chirp_PB_Clicked)
-        chirp_grid.addWidget(self.chirp_PB,0,7)
+        chirp_grid.addWidget(self.chirp_PB,1,6)
+        
+        self.times_to_chirp_SB = QSpinBox()
+        self.times_to_chirp_SB.setSuffix(' chirps')
+        self.times_to_chirp_SB.setRange(1,2000)
+        chirp_grid.addWidget(self.times_to_chirp_SB,0,7)
+        
+        self.time_to_listen_SB = QSpinBox()
+        self.time_to_listen_SB.setSuffix(' listens')
+        self.time_to_listen_SB.setRange(1,30000)
+        chirp_grid.addWidget(self.time_to_listen_SB,1,7)
         
         
         chirp_GB.setLayout(chirp_grid)
@@ -382,10 +373,6 @@ class BBGUI(QWidget):
         hLay.addWidget(mcu_GB)
         hLay.addWidget(chirp_GB)
         
-        self.chirp_settings_changed_callback()
-        
-        # vlay = QVBoxLayout()
-        # vlay.addWidget(hLay)
         
         self.experiment_settings_GB.setLayout(hLay)
         self.mainVLay.addWidget(self.experiment_settings_GB)
@@ -578,33 +565,6 @@ class BBGUI(QWidget):
         if action == set_current_time:
             self.experiment_folder_name_TE.setText(self.get_current_experiment_time())
             
-    
-    # callback
-    def preview_chirp_PB_Clicked(self):
-        """_summary_
-        """
-        logging.debug("preview_chirp_PB_Clicked")
-        
-
-        plt.close('Chirp Preview')
-        plt.figure("Chirp Preview")
-        
-        duration = self.chirp_duration_SB.value() * 1e-3
-        start = self.chirp_start_freq_SB.value() * 1e3
-        stop = self.chirp_stop_freq_SB.value() * 1e3
-        method = self.chirp_type_CB.currentText()
-        sample_rate = 1e6  # Define your desired sample rate (1 MHz in this case)
-        t = np.arange(0, duration, 1 / sample_rate)
-
-        y_chirp = signal.chirp(t, f0=start, f1=stop, t1=t[-1], method=method)
-
-        # Plotting the spectrogram
-        plt.specgram(y_chirp, Fs=sample_rate)
-        plt.xlabel('Time (s)')
-        plt.ylabel('Frequency (Hz)')
-        plt.title('Spectrogram of Chirp Signal')
-        plt.colorbar(label='Intensity')
-        plt.show()
 
 
     def upload_chirp_PB_Clicked(self):
@@ -627,6 +587,9 @@ class BBGUI(QWidget):
         spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
         DB_range = 40
         f_plot_bounds = (30E3, 100E3)
+        
+        listen_time = self.time_to_listen_SB.value()
+        times_to_chirp = self.times_to_chirp_SB.value()
         
 
         while True:
@@ -658,25 +621,6 @@ class BBGUI(QWidget):
             count +=1
     
 
-        
-        
-    def chirp_settings_changed_callback(self):
-        open_figures = plt.get_figlabels()
-        
-        duration = self.chirp_duration_SB.value()
-        
-        # display chirp buffer length
-        chirp_len = duration*1e-3*1e6
-        self.chirp_buffer_length_SB.setText(f"{chirp_len:.0f}")
-        
-        # display listen buffer length
-        listen_buffer_len = np.floor((80000 - chirp_len)/2)
-        listen_buffer_time = listen_buffer_len*1e-3
-        self.listen_buffer_length_SB.setText(f"{listen_buffer_len:.0f} {listen_buffer_time:.1f} mS")
-        
-        
-        if 'Chirp Preview' in open_figures:
-            self.preview_chirp_PB_Clicked()
         
         
 #----------------------------------------------------------------------
@@ -1269,7 +1213,7 @@ class BBGUI(QWidget):
         """adds sonar and gps box"""
         self.init_echoControl_box()
 
-        self.echo_layout = QHBoxLayout()
+        self.echo_layout = QVBoxLayout()
         self.echo_layout.addWidget(self.echo_GB)
 
         self.mainVLay.addLayout(self.echo_layout)
