@@ -31,10 +31,12 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QRadioButton,
     QErrorMessage,
+    
 
 )
 from PyQt6.QtCore import Qt, QFile, QTextStream, QThread, pyqtSignal,QObject
 from PyQt6.QtSerialPort import QSerialPortInfo
+from PyQt6.QtGui import QIcon
 
 import sys,os
 import serial
@@ -43,10 +45,10 @@ import time
 import math
 import yaml
 import matplotlib
+matplotlib.set_loglevel("error")
 import matplotlib.pyplot as plt
 from matplotlib.colorbar import Colorbar
 import matplotlib.mlab as mlab
-plt.set_loglevel("error")
 import numpy as np
 from scipy import signal
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -123,7 +125,7 @@ def plot_spec(ax:plt.axes, fig:plt.figure, spec_tup, fbounds = (30E3, 100E3), dB
 
 def process(raw, spec_settings, time_offs = 0):
 
-    unraw_balanced = rmaw - np.mean(raw)
+    unraw_balanced = raw - np.mean(raw)
     # unraw_balanced = raw
     
     pt_cut = unraw_balanced[time_offs:]
@@ -189,11 +191,12 @@ class BBGUI(QWidget):
         # add pinnae controls layout
         self.Add_Pinnae_Control_GB()
 
-        # self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
+        self.setWindowIcon(QIcon('HBAT.jpg'))
         
         self.setLayout(self.mainVLay)
-    
-        with open('bb_conf.yaml',"r") as f:
+
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        with open(dir_path+'/bb_conf.yaml',"r") as f:
             self.bb_config = yaml.safe_load(f)
 
         baud = self.bb_config['emit_MCU']['baud']
@@ -363,11 +366,7 @@ class BBGUI(QWidget):
         self.time_to_listen_SB.setRange(1,30000)
         self.time_to_listen_SB.setValue(30)
         chirp_grid.addWidget(self.time_to_listen_SB,1,7)
-        
-        self.time_off_SB = QSpinBox()
-        self.time_off_SB.setRange(0,1000000)
-        self.time_off_SB.setValue(3000)
-        chirp_grid.addWidget(self.time_off_SB,0,8)
+
         
         
         chirp_GB.setLayout(chirp_grid)
@@ -598,16 +597,17 @@ class BBGUI(QWidget):
         
         listen_time = self.time_to_listen_SB.value()
         times_to_chirp = self.times_to_chirp_SB.value()
-        time_off = self.time_off_SB.value()
         
 
         while True:
             raw,L,R = self.listener.listen(listen_time)
             
+            time_off = int(self.time_off_SB.value()*1000)
+            times_plot = self.plot_frequency_SB.value()
             
             
             
-            if count % 2== 0:
+            if count % times_plot == 0:
                 spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=time_off)
                 spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=time_off)
                 self.leftPinnaeSpec.axes.cla()  # Clear the canva
@@ -1185,9 +1185,24 @@ class BBGUI(QWidget):
         self.echo_GB.setMinimumHeight(300)
         vLay = QVBoxLayout()
 
-        gridLay = QGridLayout()
-        vLay.addLayout(gridLay)
+        settings_lay = QHBoxLayout()
+        
+        self.plot_frequency_SB = QSpinBox()
+        self.plot_frequency_SB.setPrefix("Plot every ")
+        self.plot_frequency_SB.setSuffix(" chirps")
+        self.plot_frequency_SB.setRange(0,100)
+        self.plot_frequency_SB.setValue(2)
+        settings_lay.addWidget(self.plot_frequency_SB)
 
+        self.time_off_SB = QDoubleSpinBox()
+        self.time_off_SB.setPrefix("Plot cut off: ")
+        self.time_off_SB.setSuffix(" ms")
+        self.time_off_SB.setRange(0,1000)
+        self.time_off_SB.setDecimals(2)
+        self.time_off_SB.setSingleStep(0.25)
+        settings_lay.addWidget(self.time_off_SB)
+
+        vLay.addLayout(settings_lay)
 
         # left pinnae spectogram
         hLay = QHBoxLayout()
@@ -1213,7 +1228,6 @@ class BBGUI(QWidget):
         
         
         hLay.addWidget(self.rightPinnaeSpec)
-
         vLay.addLayout(hLay)
         self.echo_GB.setLayout(vLay)
  

@@ -20,8 +20,8 @@ left_pinnae_MCU:
   type: 'SPI'
   bus: 0
   ss: 0
-  serial_num: 'nill'
-  max_angle: [180, 180, 180, 180, 180,180,180]
+  serial_num: 'null'
+
 
 
 # Grand Central SPI def
@@ -29,8 +29,8 @@ right_pinnae_MCU:
   type: 'SPI'
   bus: 0
   ss: 1
-  serial_num: 'nill'
-  max_angle: [180, 180, 180, 180, 180,180,180]
+  serial_num: 'null'
+
 
 # gps serial address
 gps_MCU: 
@@ -40,4 +40,7 @@ gps_MCU:
   serial_num: 'null'
   use: port
   rate: 1 # rate to send coordinates at
+
+pinna_max_angles: [180,180,180,0,0,0,0]
+pinna_min_angles: [0,0,0,0,-180,-180,-180]
 
