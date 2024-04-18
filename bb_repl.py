@@ -502,8 +502,8 @@ class bb_repl(Cmd):
 
         _,L,R = self.record_MCU.listen(args.listen_time_ms)
         
-        L = butter_bandpass_filter(L,30e3,100e3,fs=1e6)
-        R = butter_bandpass_filter(R,30e3,100e3,fs=1e6)
+        # L = butter_bandpass_filter(L,30e3,100e3,fs=1e6)
+        # R = butter_bandpass_filter(R,30e3,100e3,fs=1e6)
         
         
         num_axes = 0

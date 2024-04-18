@@ -123,7 +123,8 @@ def plot_spec(ax:plt.axes, fig:plt.figure, spec_tup, fbounds = (30E3, 100E3), dB
 
 def process(raw, spec_settings, time_offs = 0):
 
-    unraw_balanced = raw - np.mean(raw)
+    unraw_balanced = rmaw - np.mean(raw)
+    # unraw_balanced = raw
     
     pt_cut = unraw_balanced[time_offs:]
     remainder = unraw_balanced[:time_offs]
