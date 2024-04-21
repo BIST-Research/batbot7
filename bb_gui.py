@@ -282,28 +282,7 @@ class BBGUI(QWidget):
             
             self.listener_ports_CB.clear()
             self.listener_ports_CB.addItem(port)
-            self.listener_ports_CB.setCurrentIndex(0)
-            self.listener_connect_PB.click()
-
-        except:
-            pass
-        pass
-        baud = self.bb_config['record_MCU']['baud']
-        sn = self.bb_config['record_MCU']['serial_num']
-        port = get_port_from_serial_num(sn)
-        try:
-            self.listener.connect_Serial(serial.Serial(port=port,baudrate=baud))
-            time.sleep(0.01)
-            if not self.listener.connection_status():
-                raise
-            self.listener.disconnect_serial()
-            
-            port  = port.split('/')
-            port = "".join(port[::-2])
-            
-            self.listener_ports_CB.clear()
-            self.listener_ports_CB.addItem(port)
-            self.listener_ports_CB.setCurrentIndex(0)
+            self.listener_ports_CB.setCurrentText(port)
             self.listener_connect_PB.click()
 
         except:
@@ -885,8 +864,8 @@ class BBGUI(QWidget):
         while True:
             raw,L,R = self.listener.listen(listen_time)
             
-            np.save(L,self.runs_path+f"/left_ear_{count}.npy")
-            np.save(R,self.runs_path+f"/right_ear_{count}.npy")
+            np.save(self.runs_path+f"/left_ear_{count}.npy",L)
+            np.save(self.runs_path+f"/right_ear_{count}.npy",R)
             
             time_off = int(self.time_off_SB.value()*1000)
             times_plot = self.plot_frequency_SB.value()
