@@ -59,7 +59,7 @@ class EchoEmitter:
     def __init__(self,serial_obj:Serial = Serial(),output_freq:int = 1e6) -> None:
         
         self.itsy = serial_obj
-        self.itsy.timeout = 3
+        self.itsy.timeout = 0.5
         # self.itsy.xonxoff = False
         self.connection_status()
         
@@ -78,9 +78,16 @@ class EchoEmitter:
     
     def connect_Serial(self,serial:Serial):
         self.itsy = serial
-        self.itsy.timeout = 2
+        self.itsy.timeout = 0.5
         self.connection_status()
         self.get_max_chirp_uint16_length()
+        
+    def disconnect_serial(self):
+        try:
+            self.itsy.close()
+        except:
+            pass
+        
         
     def connection_status(self,print_:bool = False) ->bool:
         if not self.itsy.is_open:

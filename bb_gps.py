@@ -62,19 +62,32 @@ class bb_gps2():
         self.gpx_segment = GPXTrackSegment()
         self.gpx.tracks.append(self.gpx_segment)
         self.gpx_point_count = 0
-        self.gpx_point_save_threshold = 120
+        self.gpx_point_save_threshold = 60
         self.gpx_file_count = 0
+        
+        self.total_coords_count = 0
+        self.last_coord = [0,0]
 
-        self.run_filename = "unset"
+
     
     def connect_Serial(self,serial:Serial):
         self.serial = serial
         
     def connection_status(self)->bool:
         return self.serial.is_open
+    
+    def disconnect_serial(self):
+        try:
+            self.serial.close()
+        except:
+            pass
+        
+    def get_num_coodinates(self)->int:
+        return self.total_coords_count
         
     
-    def run(self, file_name: str, dir = None):
+    def run(self, dir:str = "",do_print:bool = False):
+        self.dump_dir = dir
         
         if not self.set_ubx_only_output(True):
             exit("Failed to set ubx output to only ubx")
@@ -91,7 +104,6 @@ class bb_gps2():
         logging.debug("Success setting UBX parameters")
         print("Success setting UBX parameters")
         
-        self.run_filename = file_name
 
         # corrections for creating 
         ntrip_corrections = Queue()
@@ -132,13 +144,15 @@ class bb_gps2():
                 msg = ntrip_corrections.get()
                 raw,_ = msg
                 self.serial.write(raw)
-                print("Sent NTRIP Corrections")
+                if do_print:
+                    print("Sent NTRIP Corrections")
 
             # poll serial for messages
             (_,msg) = self.ubr.read()
             if msg:
                 time = datetime(msg.year,msg.month,msg.day,msg.hour,msg.min,msg.second)
-                print(f"lat: {msg.lat} long: {msg.lon} identity: {msg.identity} time { time.strftime('%Y%m%d_%H%M%S') }")
+                if do_print:
+                    print(f"lat: {msg.lat} long: {msg.lon} identity: {msg.identity} time { time.strftime('%Y%m%d_%H%M%S') }")
                 track_point = GPXTrackPoint(latitude=msg.lat,
                                             longitude=msg.lon,
                                             elevation=msg.hMSL/100,
@@ -146,17 +160,20 @@ class bb_gps2():
                                             position_dilution=msg.pDOP)
                 
                 self.gpx_segment.points.append(track_point)
+                self.total_coords_count +=1
+                self.last_coord[0] = msg.lat
+                self.last_coord[1] = msg.lon
 
                 self.save_gpx_data()
 
         self.save_gpx_data()
             
     def save_gpx_data(self)->None:
-        if self.gpx_point_count >= self.gpx_point_save_threshold or self.stop_event.is_set():
+        if self.gpx_point_count >= self.gpx_point_save_threshold or (self.stop_event.is_set() and self.gpx_point_count > 1):
             xml = self.gpx.to_xml()
-            filename = self.run_filename+"_GPS_"+strftime("%Y%m%d_%H%M%S")+"_part"+str(self.gpx_file_count)+".gpx"
+            filename = "GPS_"+strftime("%Y%m%d_%H%M%S")+"_part"+str(self.gpx_file_count)+".gpx"
             
-            with open(filename,"w") as file:
+            with open(self.dump_dir+"/"+filename,"w") as file:
                 file.write(xml)
 
             self.gpx_file_count+=1
@@ -164,10 +181,9 @@ class bb_gps2():
 
             # reset the segment
             self.gpx = GPX()
-            self.gpx.name = "BatBot 7"
-            self.gpx.description = "GPS data using zed f9p"
-
+            self.gpx.name = "Batbot 7 GPS"
             self.gpx_segment = GPXTrackSegment()
+            self.gpx.tracks.append(self.gpx_segment)
 
         self.gpx_point_count+=1
         
@@ -222,6 +238,16 @@ class bb_gps2():
         self.serial.write(msg.serialize())
         self.serial.flush()
         return self.check_for_ubx_ack(f"CFG_USBINPROT_RTCM3X {enable}")
+
+    def set_serial_str(self)->bool:
+        cfg_data = []
+        
+        cfg_data.append(("CFG_USB_SERIAL_NO_STR0","BB7_GPS0".encode()))
+        msg = UBXMessage.config_set(4,0,cfg_data)
+        
+        self.serial.write(msg.serialize())
+        self.serial.flush()
+        return self.check_for_ubx_ack(f"CFG_USB_SERIAL_NO_STR0")
     
 
     
@@ -247,20 +273,21 @@ if __name__ == "__main__":
     
     print("Starting batbot gps ")
     
-    gps = bb_gps2(Serial('COM4', 9600, timeout=3),
-                  ntripuser="masonlopez@vt.com")
+    gps = bb_gps2(Serial('/dev/tty.usbmodemBB7_GPS01', 9600, timeout=3))
+    # gps = bb_gps2(Serial('/dev/tty.usbmodem14101', 9600, timeout=3),
+    #               ntripuser="masonlopez@vt.com")
     
     # gps.run("experiment1")
-    gps_thread = Thread(target=gps.run,args=("Experiments1",None))
+    # gps_thread = Thread(target=gps.run,args=("Experiments1",None))
 
 
-    gps_thread.start()
+    # gps_thread.start()
 
 
     msg = input("press any key to stop \n\n")
     print("Ending collections")
 
-    gps.stop_event.set()
+    # gps.stop_event.set()
 
         
     

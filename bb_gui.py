@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QRadioButton,
     QErrorMessage,
+    QFileDialog
     
 
 )
@@ -59,6 +60,7 @@ import qdarkstyle
 import pyqtgraph as pg
 import bb_listener
 import bb_emitter
+import bb_gps
 import threading
 from serial_helper import get_port_from_serial_num
 
@@ -137,6 +139,14 @@ def process(raw, spec_settings, time_offs = 0):
     return spec_tup, pt_cut, remainder
 
 
+class ComboBox(QComboBox):
+    popupAboutToBeShown = pyqtSignal()
+
+    def showPopup(self):
+        self.popupAboutToBeShown.emit()
+        super(ComboBox, self).showPopup()
+        
+
 # logging stuff
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -155,6 +165,7 @@ DAC_ADC_FREQ = 1e6
 
 NUM_PINNAE = 7
 
+
 class BBGUI(QWidget):
     """GUI for controlling Bat Bot"""
     
@@ -167,14 +178,18 @@ class BBGUI(QWidget):
     right_pinna = PinnaeController(SpiDev(0,1))
     emitter = bb_emitter.EchoEmitter()
     listener = bb_listener.EchoRecorder()
-
+    gps = bb_gps.bb_gps2()
 
     instructionThread = None
     instructionThreadRunning = False
     
+    gpsThread = None
+    gpsThreadRunning = False
+    
     left_pinna_plotted = False
     right_pinna_plotted = False
-    
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
 
 
     def __init__(self,emitter:bb_emitter = None,listener:bb_listener=None, l_pinna:PinnaeController=None, r_pinna:PinnaeController=None):
@@ -195,26 +210,130 @@ class BBGUI(QWidget):
         
         self.setLayout(self.mainVLay)
 
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        with open(dir_path+'/bb_conf.yaml',"r") as f:
+        # dir_path = os.path.dirname(os.path.realpath(__file__))
+        with open(self.dir_path+'/bb_conf.yaml',"r") as f:
             self.bb_config = yaml.safe_load(f)
 
+
+        
+        # make experiments
+        if not os.path.exists(self.dir_path+"/experiments"):
+            os.makedirs(self.dir_path+"/experiments")
+            print("Made experiments folder")
+        else:
+            print("Experiments folder exists")
+            
+
+        self.experiment_path = self.dir_path+"/experiments/"+self.curExperiment
+        os.makedirs(self.experiment_path)
+        
+        self.gps_dump_path = self.experiment_path+'/GPS'
+        os.makedirs(self.gps_dump_path)
+        
+        self.runs_path = self.experiment_path+'/RUNS'
+        os.makedirs(self.runs_path)
+
+        self.connect_MCUs()
+        
+        for i in range(NUM_PINNAE):
+            self.motor_min_limit_changed_CB(i)
+            self.motor_max_limit_changed_CB(i)
+        
+        
+        
+    def connect_MCUs(self):
+        if not self.bb_config:
+            return
+        
         baud = self.bb_config['emit_MCU']['baud']
         sn = self.bb_config['emit_MCU']['serial_num']
         port = get_port_from_serial_num(sn)
         try:
-            self.emitter = bb_emitter.EchoEmitter(serial.Serial(port=port,baudrate=baud))
+            self.emitter.connect_Serial(serial.Serial(port=port,baudrate=baud))
+            time.sleep(0.01)
+            if not self.emitter.connection_status():
+                raise
+            self.emitter.disconnect_serial()
+            port  = port.split('/')
+            port = "".join(port[::-2])
+            
+            
+            self.emitter_ports_CB.clear()
+            self.emitter_ports_CB.addItem(port)
+            self.emitter_ports_CB.setCurrentText(port)
+            self.emitter_connect_PB.click()
+            print("ran")
         except:        
+            print("failed")
             pass
 
         baud = self.bb_config['record_MCU']['baud']
         sn = self.bb_config['record_MCU']['serial_num']
         port = get_port_from_serial_num(sn)
-
         try:
-            self.listener = bb_listener.EchoRecorder(serial.Serial(port=port,baudrate=baud))
+            self.listener.connect_Serial(serial.Serial(port=port,baudrate=baud))
+            time.sleep(0.01)
+            if not self.listener.connection_status():
+                raise
+            self.listener.disconnect_serial()
+            
+            port  = port.split('/')
+            port = "".join(port[::-2])
+            
+            self.listener_ports_CB.clear()
+            self.listener_ports_CB.addItem(port)
+            self.listener_ports_CB.setCurrentIndex(0)
+            self.listener_connect_PB.click()
+
         except:
             pass
+        pass
+        baud = self.bb_config['record_MCU']['baud']
+        sn = self.bb_config['record_MCU']['serial_num']
+        port = get_port_from_serial_num(sn)
+        try:
+            self.listener.connect_Serial(serial.Serial(port=port,baudrate=baud))
+            time.sleep(0.01)
+            if not self.listener.connection_status():
+                raise
+            self.listener.disconnect_serial()
+            
+            port  = port.split('/')
+            port = "".join(port[::-2])
+            
+            self.listener_ports_CB.clear()
+            self.listener_ports_CB.addItem(port)
+            self.listener_ports_CB.setCurrentIndex(0)
+            self.listener_connect_PB.click()
+
+        except:
+            pass
+        pass
+
+        baud = self.bb_config['gps_MCU']['baud']
+        sn = self.bb_config['gps_MCU']['serial_num']
+        port = get_port_from_serial_num(sn)
+        try:
+            self.gps.connect_Serial(serial.Serial(port=port,baudrate=baud))
+            time.sleep(0.01)
+            if not self.gps.connection_status():
+                raise
+            self.gps.disconnect_serial()
+            
+            port  = port.split('/')
+            port = "".join(port[::-2])
+            
+            self.gps_ports_CB.clear()
+            self.gps_ports_CB.addItem(port)
+            self.gps_ports_CB.setCurrentIndex(0)
+            self.gps_connect_PB.click()
+
+            # self.gpsThread = threading.Thread(target=self.gps.run,args=(self.gps_dump_path,None))
+            
+            # self.gpsThread.start()
+        except:
+            pass
+        pass
         
 
 #----------------------------------------------------------------------
@@ -233,12 +352,12 @@ class BBGUI(QWidget):
         directory_grid.addWidget(self.directory_TE,0,1)
 
         # name of experiment
-        curExperiment = self.get_current_experiment_time()
+        self.curExperiment = self.get_current_experiment_time()
         # set the window title the name of experiment
-        self.setWindowTitle("BatBot 7 GUI:\t\t\t\t" + curExperiment)
+        self.setWindowTitle("BatBot 7 GUI:\t\t\t\t" + self.curExperiment)
         
         # set the name
-        self.experiment_folder_name_TE = QLineEdit(curExperiment)
+        self.experiment_folder_name_TE = QLineEdit(self.curExperiment)
         self.experiment_folder_name_TE.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.experiment_folder_name_TE.customContextMenuRequested.connect(self.experiment_folder_name_TE_contextMenu)
         
@@ -246,10 +365,12 @@ class BBGUI(QWidget):
         directory_grid.addWidget(self.experiment_folder_name_TE,1,1)
         directory_GB.setLayout(directory_grid)
         
+
+        
         # -------------------------------------------------------------------
         # communication settings
         self.mcu_grid = QGridLayout()
-        mcu_GB = QGroupBox("Pinna Protocol")
+        pinna_MCU = QGroupBox("Pinna MCU")
         
         spi_CB = QCheckBox("SPI")
         spi_CB.setChecked(True)
@@ -271,24 +392,25 @@ class BBGUI(QWidget):
         self.right_pinna_spi_bus_SB.setValue(0)
 
         # uart config stuff
-        self.left_pinna_uart_search_PB = QPushButton("Search")
-        self.left_pinna_uart_name_CB = QComboBox()
+        self.left_pinna_uart_name_CB = ComboBox()
+        self.left_pinna_uart_name_CB.popupAboutToBeShown.connect(lambda: self.populate_serial_ports_CB(self.left_pinna_uart_name_CB))
         self.left_pinna_uart_connect_PB = QPushButton("Connect")
+        self.left_pinna_uart_connect_PB.setCheckable(True)
 
-        self.right_pinna_uart_search_PB = QPushButton("Search")
-        self.right_pinna_uart_name_CB = QComboBox()
+        self.right_pinna_uart_name_CB = ComboBox()
+        self.right_pinna_uart_name_CB.popupAboutToBeShown.connect(lambda: self.populate_serial_ports_CB(self.right_pinna_uart_name_CB))
         self.right_pinna_uart_connect_PB = QPushButton("Connect")
+        self.right_pinna_uart_connect_PB.setCheckable(True)
 
         # connect their callbacks
         self.left_pinna_spi_ss_SB.valueChanged.connect(lambda: self.mcu_spi_options_pressed())
         self.left_pinna_spi_bus_SB.valueChanged.connect(lambda: self.mcu_spi_options_pressed())
-        self.left_pinna_uart_search_PB.pressed.connect(lambda: self.uart_search_PB_pressed('left'))
-        self.left_pinna_uart_connect_PB.pressed.connect(lambda: self.uart_connect_PB_pressed('left'))
+        self.left_pinna_uart_connect_PB.pressed.connect(lambda: self.connect_uart_PB_CB(self.left_pinna_uart_name_CB,self.left_pinna_uart_connect_PB))
 
         self.right_pinna_spi_ss_SB.valueChanged.connect(lambda: self.mcu_spi_options_pressed())
         self.right_pinna_spi_bus_SB.valueChanged.connect(lambda: self.mcu_spi_options_pressed())
-        self.right_pinna_uart_search_PB.pressed.connect(lambda: self.uart_search_PB_pressed('right'))
-        self.right_pinna_uart_connect_PB.pressed.connect(lambda: self.uart_connect_PB_pressed('right'))
+        self.right_pinna_uart_connect_PB.pressed.connect(lambda: self.connect_uart_PB_CB(self.right_pinna_uart_name_CB,self.right_pinna_uart_connect_PB))
+        # self.right_pinna_uart_connect_PB.pressed.connect(lambda: self.uart_connect_PB_pressed('right'))
         
         # create button group taht only allows one at a time
         self.pinna_protocol_BG = QButtonGroup()
@@ -300,13 +422,63 @@ class BBGUI(QWidget):
         # call the method to initialize
         self.pinna_protocol_BG_CB()
         
-        self.mcu_grid.addWidget(QLabel("type"),0,0)
+        self.mcu_grid.addWidget(QLabel("Comm. Type"),0,0)
         self.mcu_grid.addWidget(QLabel("Left"),0,1)
         self.mcu_grid.addWidget(QLabel("Right"),0,2)
         self.mcu_grid.addWidget(spi_CB,1,0)
         self.mcu_grid.addWidget(uart_CB,2,0)
-        mcu_GB.setLayout(self.mcu_grid)
+        pinna_MCU.setLayout(self.mcu_grid)
         
+        
+        # -------------------------------------------------------------------
+        # sonar and chirp and GPS MCU
+        sonar_MCU_GB = QGroupBox("MCU CONFIG")
+        sonar_MCU_grid = QGridLayout()
+        
+        CB_WIDTH = 130
+        #GPS
+        sonar_MCU_grid.addWidget(QLabel("GPS"),0,0)
+        self.gps_ports_CB = ComboBox()
+        self.gps_ports_CB.setFixedWidth(CB_WIDTH)
+        self.gps_ports_CB.popupAboutToBeShown.connect(lambda: self.populate_serial_ports_CB(self.gps_ports_CB))
+        self.gps_ports_CB.setPlaceholderText("SEARCH")
+        sonar_MCU_grid.addWidget(self.gps_ports_CB,1,0)
+        self.gps_connect_PB = QPushButton("Connect")
+        self.gps_connect_PB.setCheckable(True)
+        self.gps_connect_PB.setAutoExclusive(False)
+        self.gps_connect_PB.pressed.connect(lambda: self.connect_uart_PB_CB(self.gps_ports_CB,self.gps_connect_PB))
+        sonar_MCU_grid.addWidget(self.gps_connect_PB,2,0)
+        
+        # emitter 
+        sonar_MCU_grid.addWidget(QLabel("Emitter"),0,1)
+        self.emitter_ports_CB = ComboBox()
+        self.emitter_ports_CB.setFixedWidth(CB_WIDTH)
+        self.emitter_ports_CB.setPlaceholderText("SEARCH")
+        self.emitter_ports_CB.popupAboutToBeShown.connect(lambda: self.populate_serial_ports_CB(self.emitter_ports_CB) )
+        sonar_MCU_grid.addWidget(self.emitter_ports_CB,1,1)
+        self.emitter_connect_PB = QPushButton("Connect")
+        self.emitter_connect_PB.setCheckable(True)
+        self.emitter_connect_PB.setAutoExclusive(False)
+        
+        self.emitter_connect_PB.pressed.connect(lambda: self.connect_uart_PB_CB(self.emitter_ports_CB,self.emitter_connect_PB))
+        sonar_MCU_grid.addWidget(self.emitter_connect_PB,2,1)
+        
+        
+        # listener
+        sonar_MCU_grid.addWidget(QLabel("Listener"),0,2)
+        self.listener_ports_CB = ComboBox()
+        self.listener_ports_CB.setFixedWidth(CB_WIDTH)
+        self.listener_ports_CB.setPlaceholderText("SEARCH")
+        self.listener_ports_CB.popupAboutToBeShown.connect(lambda: self.populate_serial_ports_CB(self.listener_ports_CB) )
+        sonar_MCU_grid.addWidget(self.listener_ports_CB,1,2)
+        self.listener_connect_PB = QPushButton("Connect")
+        self.listener_connect_PB.setCheckable(True)
+        self.listener_connect_PB.setAutoExclusive(False)
+        self.listener_connect_PB.pressed.connect(lambda: self.connect_uart_PB_CB(self.listener_ports_CB,self.listener_connect_PB))
+        sonar_MCU_grid.addWidget(self.listener_connect_PB,2,2)
+        
+        sonar_MCU_GB.setLayout(sonar_MCU_grid)
+
         
         # -------------------------------------------------------------------
         # settings for chirps
@@ -362,6 +534,7 @@ class BBGUI(QWidget):
         chirp_grid.addWidget(self.times_to_chirp_SB,0,7)
         
         self.time_to_listen_SB = QSpinBox()
+        self.time_to_listen_SB.setPrefix('listen: ')
         self.time_to_listen_SB.setSuffix(' ms')
         self.time_to_listen_SB.setRange(1,30000)
         self.time_to_listen_SB.setValue(30)
@@ -376,33 +549,144 @@ class BBGUI(QWidget):
         # -------------------------------------------------------------------
         # put together two groupboxes
         hLay = QHBoxLayout()
-        hLay.addWidget(directory_GB)
-        hLay.addWidget(mcu_GB)
+        # hLay.addWidget(directory_GB)
+        hLay.addWidget(sonar_MCU_GB)
+        hLay.addWidget(pinna_MCU)
         hLay.addWidget(chirp_GB)
         
         
         self.experiment_settings_GB.setLayout(hLay)
         self.mainVLay.addWidget(self.experiment_settings_GB)
         
-        
-    def uart_search_PB_pressed(self,ear)->None:
-
+    def populate_serial_ports_CB(self,box:ComboBox):
         available_ports = QSerialPortInfo.availablePorts()
         if len(available_ports) == 0:
             return
         
-        if ear == 'left':
-            self.left_pinna_uart_name_CB.clear()
-            self.left_pinna_uart_connect_PB.setEnabled(True)
-            self.left_pinna_uart_name_CB.setEnabled(True)
-            for port_info in available_ports:
-                self.left_pinna_uart_name_CB.addItem(port_info.portName())
-        else:
-            self.right_pinna_uart_name_CB.clear()
-            self.right_pinna_uart_connect_PB.setEnabled(True)
-            self.right_pinna_uart_name_CB.setEnabled(True)
-            for port_info in available_ports:
-                self.right_pinna_uart_name_CB.addItem(port_info.portName())
+        curIndex = box.currentIndex()
+        cur_port = box.currentText()
+        
+            
+        box.clear()
+        box.setEnabled(True)
+        for i,port_info in enumerate(available_ports):
+            box.addItem(port_info.portName())
+            if curIndex != -1 and port_info.portName() == cur_port:
+                box.setCurrentIndex(i)
+            
+        
+        
+    def connect_uart_PB_CB(self, cb:ComboBox,pb:QPushButton):
+        # have to append for linux based systems
+        port = cb.currentText()
+        cb.setEnabled(True)
+        
+        
+        
+        if pb == self.gps_connect_PB:
+            yaml_name = 'gps_MCU'
+        
+        elif pb == self.emitter_connect_PB:
+            yaml_name = 'emit_MCU'
+            
+        elif pb == self.listener_connect_PB:
+            yaml_name = 'record_MCU'
+        
+        elif pb == self.left_pinna_uart_connect_PB:
+            yaml_name = 'left_pinnae_MCU'
+
+        elif pb == self.right_pinna_uart_connect_PB:
+            yaml_name = 'right_pinnae_MCU'
+            
+            
+        baud = self.bb_config[yaml_name]['baud']
+        
+        
+        if pb.isChecked(): # connected
+            pb.setChecked(True)
+            pb.setText("Connect")
+            print(f"Disconnecting")
+            if pb == self.gps_connect_PB:
+                self.gps.stop()
+                while self.gpsThread.is_alive():
+                    self.gpsThread.join()    
+                self.gps.disconnect_serial()
+                
+            elif pb == self.emitter_connect_PB:
+                self.emitter.disconnect_serial()
+
+            elif pb == self.listener_connect_PB:
+                self.listener.disconnect_serial()
+                
+            elif pb == self.left_pinna_uart_connect_PB:
+                self.left_pinna.disconnect_serial()
+
+            elif pb == self.right_pinna_uart_connect_PB:
+                self.right_pinna.disconnect_serial()
+                    
+        else:# not connected
+            if port == '':
+                pb.setChecked(True)
+                return
+
+            if platform.system() == "Linux" or platform.system() == "Darwin":
+                port = "/dev/" + port
+                logging.debug(f"On platform: {platform.system()}")
+                
+                
+            try:
+                test = serial.Serial(port, baudrate=baud)
+                if not test.is_open:
+                    raise
+                test.close()
+                
+                
+                if pb == self.gps_connect_PB:
+                    self.gps = bb_gps.bb_gps2(serial.Serial(port,baudrate=baud))
+                    time.sleep(0.01)
+                    if not self.gps.connection_status():
+                        raise
+                    
+                    self.gps.stop_event.clear()
+                    self.gpsThread = threading.Thread(target=self.gps.run,args=(self.gps_dump_path,))
+                    self.gpsThread.start()
+
+                elif pb == self.emitter_connect_PB:
+                    self.emitter.connect_Serial(serial.Serial(port,baudrate=baud))
+                    time.sleep(0.01)
+                    if not self.emitter.connection_status():
+                        raise
+
+                elif pb == self.listener_connect_PB:
+                    self.listener.connect_Serial(serial.Serial(port,baudrate=baud))
+                    time.sleep(0.01)
+                    if not self.listener.connection_status():
+                        raise
+
+                elif pb == self.left_pinna_uart_connect_PB:
+                    self.left_pinna.config_uart(serial.Serial(port,baudrate=baud))
+                    time.sleep(0.01)
+                    if not self.left_pinna.connection_status():
+                        raise
+
+                elif pb == self.right_pinna_uart_connect_PB:
+                    self.right_pinna.config_uart(serial.Serial(port,baudrate=baud))
+                    time.sleep(0.01)
+                    if not self.right_pinna.connection_status():
+                        raise
+                
+                
+            except:
+                print(f"Failed to connect to {port}")
+                pb.setChecked(True)
+            
+            print(f"Success connecting to: {port}")
+            pb.setChecked(False)
+            pb.setText("Disconnect")
+            cb.setEnabled(False)
+        
+            
+        
             
     
     def uart_connect_PB_pressed(self,ear)->None:
@@ -423,43 +707,37 @@ class BBGUI(QWidget):
             if self.left_pinna_uart_connect_PB.text() == "Disconnect":
                 self.left_pinna_uart_connect_PB.setText("Connect")
                 self.left_pinna.close_uart()
-                self.left_pinna_uart_search_PB.setEnabled(True)
                 self.left_pinna_uart_name_CB.setEnabled(True)
                 return
         else:
             if self.right_pinna_uart_connect_PB.text() == "Disconnect":
                 self.right_pinna_uart_connect_PB.setText("Connect")
                 self.left_pinna.close_uart()
-                self.right_pinna_uart_search_PB.setEnabled(True)
                 self.right_pinna_uart_name_CB.setEnabled(True)
                 return
             
         try:
-            test = serial.Serial(port,baudrate=960000)
+            test = serial.Serial(port,baudrate=115200)
             test.close()
             
             if ear == 'left':
                 self.left_pinna.config_uart(port)
                 logging.debug(f"left pinna using serial: {new_serial_str}")
                 self.left_pinna_uart_connect_PB.setText("Disconnect")
-                self.left_pinna_uart_search_PB.setEnabled(False)
                 self.left_pinna_uart_name_CB.setEnabled(False)
             else:
                 self.right_pinna.config_uart(port)
                 logging.debug(f"left pinna using serial: {new_serial_str}")
                 self.right_pinna_uart_connect_PB.setText("Disconnect")
-                self.right_pinna_uart_search_PB.setEnabled(False)
                 self.right_pinna_uart_name_CB.setEnabled(False)
 
             self.set_motor_GB_enabled(True)
         except:
             if ear == 'left':
                 self.left_pinna_uart_connect_PB.setText("Connect")
-                self.left_pinna_uart_search_PB.setEnabled(True)
                 self.left_pinna_uart_name_CB.setEnabled(True)
             else:
                 self.right_pinna_uart_connect_PB.setText("Connect")
-                self.right_pinna_uart_search_PB.setEnabled(True)
                 self.right_pinna_uart_name_CB.setEnabled(True)
 
             self.set_motor_GB_enabled(False)
@@ -489,19 +767,15 @@ class BBGUI(QWidget):
             
             self.mcu_grid.removeWidget(self.left_pinna_uart_name_CB)
             self.mcu_grid.removeWidget(self.left_pinna_uart_connect_PB)
-            self.mcu_grid.removeWidget(self.left_pinna_uart_search_PB)
             self.left_pinna_uart_name_CB.setVisible(False)
             self.left_pinna_uart_connect_PB.setVisible(False)
-            self.left_pinna_uart_search_PB.setVisible(False)
             self.left_pinna_uart_name_CB.setEnabled(False)
             self.left_pinna_uart_connect_PB.setEnabled(False)
 
             self.mcu_grid.removeWidget(self.right_pinna_uart_name_CB)
             self.mcu_grid.removeWidget(self.right_pinna_uart_connect_PB)
-            self.mcu_grid.removeWidget(self.right_pinna_uart_search_PB)
             self.right_pinna_uart_name_CB.setVisible(False)
             self.right_pinna_uart_connect_PB.setVisible(False)
-            self.right_pinna_uart_search_PB.setVisible(False)
             self.right_pinna_uart_name_CB.setEnabled(False)
             self.right_pinna_uart_connect_PB.setEnabled(False)
             
@@ -522,23 +796,21 @@ class BBGUI(QWidget):
             self.right_pinna_spi_ss_SB.setVisible(False)
             
             # add uart stuff
-            self.mcu_grid.addWidget(self.left_pinna_uart_search_PB,1,1)
-            self.mcu_grid.addWidget(self.left_pinna_uart_name_CB,2,1)
-            self.mcu_grid.addWidget(self.left_pinna_uart_connect_PB,3,1)
+            self.mcu_grid.addWidget(self.left_pinna_uart_name_CB,1,1)
+            self.mcu_grid.addWidget(self.left_pinna_uart_connect_PB,2,1)
             self.left_pinna_uart_name_CB.setVisible(True)
+            self.left_pinna_uart_name_CB.setEnabled(True)
             self.left_pinna_uart_connect_PB.setVisible(True)
-            self.left_pinna_uart_search_PB.setVisible(True)
-            self.left_pinna_uart_search_PB.setEnabled(True)
+            self.left_pinna_uart_connect_PB.setEnabled(True)
      
-            self.mcu_grid.addWidget(self.right_pinna_uart_search_PB,1,2)
-            self.mcu_grid.addWidget(self.right_pinna_uart_name_CB,2,2)
-            self.mcu_grid.addWidget(self.right_pinna_uart_connect_PB,3,2)
+            self.mcu_grid.addWidget(self.right_pinna_uart_name_CB,1,2)
+            self.mcu_grid.addWidget(self.right_pinna_uart_connect_PB,2,2)
             self.right_pinna_uart_name_CB.setVisible(True)
+            self.right_pinna_uart_name_CB.setEnabled(True)
             self.right_pinna_uart_connect_PB.setVisible(True)
-            self.right_pinna_uart_search_PB.setVisible(True)
-            self.right_pinna_uart_search_PB.setEnabled(True)
+            self.right_pinna_uart_connect_PB.setEnabled(True)
 
-            self.set_motor_GB_enabled(False)
+            # self.set_motor_GB_enabled(False)
             
         
     def mcu_spi_options_pressed(self)->None:
@@ -576,6 +848,12 @@ class BBGUI(QWidget):
 
     def upload_chirp_PB_Clicked(self):
         """ when clicked"""
+        
+        if not self.emitter_connect_PB.isChecked():
+            win = QErrorMessage(self)
+            win.showMessage("EMITTER IS NOT CONNECTED!")
+            return
+        
         fs = self.chirp_start_freq_SB.value()
         fe = self.chirp_stop_freq_SB.value()
         tend = self.chirp_duration_SB.value()
@@ -585,6 +863,11 @@ class BBGUI(QWidget):
         
     def chirp_PB_Clicked(self):
         """ """
+        
+        if not self.listener_connect_PB.isChecked():
+            win = QErrorMessage(self)
+            win.showMessage("LISTENER IS NOT CONNECTED!")
+            return
 
         count = 0
         
@@ -601,6 +884,9 @@ class BBGUI(QWidget):
 
         while True:
             raw,L,R = self.listener.listen(listen_time)
+            
+            np.save(L,self.runs_path+f"/left_ear_{count}.npy")
+            np.save(R,self.runs_path+f"/right_ear_{count}.npy")
             
             time_off = int(self.time_off_SB.value()*1000)
             times_plot = self.plot_frequency_SB.value()
@@ -723,6 +1009,8 @@ class BBGUI(QWidget):
         # number_motors = 6
         max_value = 10000
         
+        lim_val = 90
+        
         for index in range(NUM_PINNAE):
             vertical_layout = QVBoxLayout()
             
@@ -736,7 +1024,7 @@ class BBGUI(QWidget):
             
             # add max spinbox
             self.motor_max_limit_SB[index].setRange(-max_value,max_value)
-            self.motor_max_limit_SB[index].setValue(180)
+            self.motor_max_limit_SB[index].setValue(lim_val)
             grid_lay.addWidget(self.motor_max_limit_SB[index],0,1)
             
             # add value spinbox
@@ -745,7 +1033,7 @@ class BBGUI(QWidget):
             
             # add value slider
             self.motor_value_SLIDER[index].setMinimumHeight(100)
-            self.motor_value_SLIDER[index].setRange(-max_value,max_value)
+            self.motor_value_SLIDER[index].setRange(-lim_val,lim_val)
             self.motor_value_SLIDER[index].setValue(0)
             grid_lay.addWidget(self.motor_value_SLIDER[index],1,1)
             
@@ -754,7 +1042,7 @@ class BBGUI(QWidget):
             
             # add min spinbox
             self.motor_min_limit_SB[index].setRange(-max_value,max_value)
-            self.motor_min_limit_SB[index].setValue(-180)
+            self.motor_min_limit_SB[index].setValue(-lim_val)
             grid_lay.addWidget(self.motor_min_limit_SB[index],2,1)
             
             ## add the layout
@@ -787,29 +1075,44 @@ class BBGUI(QWidget):
         # create layout for buttons side of table
         table_side_v_lay = QVBoxLayout()
         
-        # settings for making ears realistic
-        self.realistic_ears_CB = QCheckBox("Realistic Ears")
-        self.realistic_ears_CB.setToolTip("Each ear will be out of phase if checked like a real bat")
-        table_side_v_lay.addWidget(self.realistic_ears_CB)
+        
+        table_side_grid = QGridLayout()
+        # control type 
+        self.selected_pinna_QB = QComboBox()
+        self.selected_pinna_QB.addItem("left")
+        self.selected_pinna_QB.addItem("right")
+        self.selected_pinna_QB.addItem("both")
+        table_side_grid.addWidget(QLabel("Control:"))
+        table_side_grid.addWidget(self.selected_pinna_QB,0,1)
+        
+        # load from file
+        self.load_movements_PB = QPushButton("LOAD")
+        self.load_movements_PB.pressed.connect(self.load_movements_PB_cb)
+        table_side_grid.addWidget(self.load_movements_PB,1,0)
+        
+        # HOME 
+        self.home_pinnas_PB = QPushButton("HOME")
+        
+        table_side_grid.addWidget(self.home_pinnas_PB,1,1)
+    
         
         # create start button
-        table_side_grid = QGridLayout()
         self.start_stop_instruction_PB = QPushButton("Start")
         self.start_stop_instruction_PB.pressed.connect(self.start_stop_instruction_PB_pressed_CB)
-        table_side_grid.addWidget(self.start_stop_instruction_PB,0,0)
+        table_side_grid.addWidget(self.start_stop_instruction_PB,2,0)
         
         # acuation rate
         self.intstruction_speed_SB = QSpinBox()
         self.intstruction_speed_SB.setValue(1)
         self.intstruction_speed_SB.setRange(1,50)
         self.intstruction_speed_SB.setSuffix(" Hz")
-        table_side_grid.addWidget(self.intstruction_speed_SB,0,1)
+        table_side_grid.addWidget(self.intstruction_speed_SB,2,1)
         
         # cycle counter
-        table_side_grid.addWidget(QLabel("Count:"),1,0)
+        table_side_grid.addWidget(QLabel("Count:"),3,0)
         self.cycle_counter_SB = QSpinBox()
         self.cycle_counter_SB.setEnabled(False)
-        table_side_grid.addWidget(self.cycle_counter_SB,1,1)
+        table_side_grid.addWidget(self.cycle_counter_SB,3,1)
 
         # add context menu for instruction table
         self.instruction_TABLE.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -837,6 +1140,51 @@ class BBGUI(QWidget):
         
         self.pinnae_controls_GB.setLayout(vertical_layout)
         self.mainVLay.addWidget(self.pinnae_controls_GB)
+    
+    def load_movements_PB_cb(self):
+        fd = QFileDialog(self)
+        fd.setWindowTitle("Open File")
+        fd.setNameFilter('YAML files (*.yaml)')
+        fd.setFileMode(QFileDialog.FileMode.ExistingFiles)
+        
+        if fd.exec():
+            
+            selected_files = fd.selectedFiles()
+            if selected_files:
+                file_path = selected_files[0]
+                print("Selected file:", file_path)
+                with open(file_path,'r') as f:
+                    yam_file = yaml.safe_load(f)
+                    
+                if not 'pinna_movements' in yam_file:
+                    win = QErrorMessage(self)
+                    win.showMessage("Did not find valid 'pinna_movements' in file!")
+                    return
+                
+                angles = yam_file["pinna_movements"]["angles"]
+                print("Angles:")
+                
+                num_rows = len(angles)
+
+                self.instruction_TABLE.clear()
+                self.instruction_TABLE.setRowCount(num_rows)
+
+                for row, angle_row in enumerate(angles):
+                    for col,angle in enumerate(angle_row):
+                        newItem = QTableWidgetItem()
+                        newItem.setData(0,int( angle ))
+                        self.instruction_TABLE.setItem(row,col,newItem)    
+                         
+                        
+                    
+                    
+            else:
+                return
+        else:
+            return
+
+
+    
     
     def motor_GB_contextMenu(self,position,index) -> None:
         """Create menu for each motor box to reduce the number of buttons
@@ -905,27 +1253,35 @@ class BBGUI(QWidget):
         
     def start_stop_instruction_PB_pressed_CB(self):
         if not self.instructionThreadRunning:
-             rows = self.instruction_TABLE.rowCount()
-             dataArray = np.zeros((rows,NUM_PINNAE),np.int16)
+            rows = self.instruction_TABLE.rowCount()
+            dataArray = np.zeros((rows,NUM_PINNAE),np.int16)
              
-             for row in range(self.instruction_TABLE.rowCount()):
-                 dataArray[row][0] = int(self.instruction_TABLE.item(row,0).text())
-                 dataArray[row][1] = int(self.instruction_TABLE.item(row,1).text())
-                 dataArray[row][2] = int(self.instruction_TABLE.item(row,2).text())
-                 dataArray[row][3] = int(self.instruction_TABLE.item(row,3).text())
-                 dataArray[row][4] = int(self.instruction_TABLE.item(row,4).text())
-                 dataArray[row][5] = int(self.instruction_TABLE.item(row,5).text())
-                 dataArray[row][6] = int(self.instruction_TABLE.item(row,6).text())
+            for row in range(self.instruction_TABLE.rowCount()):
+                dataArray[row][0] = int(self.instruction_TABLE.item(row,0).text())
+                dataArray[row][1] = int(self.instruction_TABLE.item(row,1).text())
+                dataArray[row][2] = int(self.instruction_TABLE.item(row,2).text())
+                dataArray[row][3] = int(self.instruction_TABLE.item(row,3).text())
+                dataArray[row][4] = int(self.instruction_TABLE.item(row,4).text())
+                dataArray[row][5] = int(self.instruction_TABLE.item(row,5).text())
+                dataArray[row][6] = int(self.instruction_TABLE.item(row,6).text())
                  
         
              # print(dataArray)
-             self.instructionThread = RunInstructionsThread(dataArray,self.intstruction_speed_SB.value(),self.left_pinna)
-             self.instructionThread.start()
-             self.instructionThread.cycle_complete.connect(self.cycle_complete_emit_callback)
-             self.instructionThread.end_motor_angles.connect(self.end_motor_values_emit_callback)
-             self.instructionThreadRunning = True
-             self.start_stop_instruction_PB.setText("Stop")
-             self.set_motor_GB_enabled(False)
+            if self.selected_pinna_QB.currentText() == 'left':
+                self.instructionThread = RunInstructionsThread(dataArray,self.intstruction_speed_SB.value(),self.left_pinna)
+                
+            elif self.selected_pinna_QB.currentText() == 'right':
+                self.instructionThread = RunInstructionsThread(dataArray,self.intstruction_speed_SB.value(),self.right_pinna)
+                
+            elif self.selected_pinna_QB.currentText() == 'both':
+                self.instructionThread = RunInstructionsThread(dataArray,self.intstruction_speed_SB.value(),self.left_pinna,self.right_pinna)
+                
+            self.instructionThread.start()
+            self.instructionThread.cycle_complete.connect(self.cycle_complete_emit_callback)
+            self.instructionThread.end_motor_angles.connect(self.end_motor_values_emit_callback)
+            self.instructionThreadRunning = True
+            self.start_stop_instruction_PB.setText("Stop")
+            self.set_motor_GB_enabled(False)
         else:
             # see end_motor_values_emit_callback for enabling - we want to update values first before enabling
             #  self.set_motor_GB_enabled(True)
@@ -1077,7 +1433,16 @@ class BBGUI(QWidget):
         Args:
             index (_type_): index of motor 
         """
-        self.left_pinna.set_motor_to_max(index)
+        if self.selected_pinna_QB.currentText() == 'left':
+            self.left_pinna.set_motor_to_max(index)
+            
+        elif self.selected_pinna_QB.currentText() == 'right':
+            self.right_pinna.set_motor_to_max(index)
+            
+        else:
+            self.right_pinna.set_motor_to_max(index)
+            self.left_pinna.set_motor_to_max(index)
+            
         self.motor_value_SB[index].setValue(self.motor_max_limit_SB[index].value())
         self.motor_value_SLIDER[index].setValue(self.motor_max_limit_SB[index].value())
         
@@ -1088,20 +1453,40 @@ class BBGUI(QWidget):
         Args:
             index (_type_): index of motor
         """
-        self.left_pinna.set_motor_to_min(index)
+        if self.selected_pinna_QB.currentText() == 'left':
+            self.left_pinna.set_motor_to_min(index)
+            
+        elif self.selected_pinna_QB.currentText() == 'right':
+            self.right_pinna.set_motor_to_min(index)
+            
+        else:
+            self.right_pinna.set_motor_to_min(index)
+            self.left_pinna.set_motor_to_min(index)
+            
         self.motor_value_SB[index].setValue(self.motor_min_limit_SB[index].value())
         self.motor_value_SLIDER[index].setValue(self.motor_min_limit_SB[index].value())
         
         
     def motor_value_SB_valueChanged(self,index):
         """Sets the new spin
+        
 
         Args:
             index (_type_): index to change
         """
         if self.motor_value_SB[index].value() != self.motor_value_SLIDER[index].value():
             self.motor_value_SLIDER[index].setValue(self.motor_value_SB[index].value())
-            self.left_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
+            
+            if self.selected_pinna_QB.currentText() == 'left':
+                self.left_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
+            
+            elif self.selected_pinna_QB.currentText() == 'right':
+                self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
+            
+            else:
+                self.left_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
+                self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
+
         
         
     def motor_value_SLIDER_valueChanged(self,index):
@@ -1112,7 +1497,16 @@ class BBGUI(QWidget):
         """
         if self.motor_value_SLIDER[index].value() != self.motor_value_SB[index].value():
             self.motor_value_SB[index].setValue(self.motor_value_SLIDER[index].value())
-            self.left_pinna.set_motor_angle(index,self.motor_value_SLIDER[index].value())
+            
+            if self.selected_pinna_QB.currentText() == 'left':
+                self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+            
+            elif self.selected_pinna_QB.currentText() == 'right':
+                self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+            
+            else:
+                self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
     
     
     def motor_set_zero_PB_callback(self,index):
@@ -1121,8 +1515,19 @@ class BBGUI(QWidget):
         Args:
             index (_type_): changing motor new zero position
         """
-        self.left_pinna.set_new_zero_position(index)
-        [min,max] = self.left_pinna.get_motor_limit(index)
+        
+        if self.selected_pinna_QB.currentText() == 'left':
+            self.left_pinna.set_new_zero_position(index)
+            [min,max] = self.left_pinna.get_motor_limit(index)
+        elif self.selected_pinna_QB.currentText() == 'right':
+            self.right_pinna.set_new_zero_position(index)
+            [min,max] = self.right_pinna.get_motor_limit(index)
+        else:
+            self.left_pinna.set_new_zero_position(index)
+            self.right_pinna.set_new_zero_position(index)
+            [min,max] = self.right_pinna.get_motor_limit(index)
+            
+            
         
         # adjust the new limits of spinbox
         self.motor_max_limit_SB[index].setValue(max)
@@ -1142,19 +1547,46 @@ class BBGUI(QWidget):
         
         new_value = self.motor_max_limit_SB[index].value()
         
-        if  self.left_pinna.set_motor_max_limit(index,new_value):
-            [min,max] = self.left_pinna.get_motor_limit(index)
-            self.motor_value_SLIDER[index].setRange(min,max)
-            self.motor_value_SB[index].setRange(min,max)
-            
-            num_rows = self.instruction_TABLE.rowCount()
-            for i in range(num_rows):
-                self.instruction_TABLE_cellChanged_callback(i,index)
-
+        if self.selected_pinna_QB.currentText() == 'left':
+            if  self.left_pinna.set_motor_max_limit(index,new_value):
+                [min,max] = self.left_pinna.get_motor_limit(index)
+                self.motor_value_SLIDER[index].setRange(min,max)
+                self.motor_value_SB[index].setRange(min,max)
+                
+                num_rows = self.instruction_TABLE.rowCount()
+                for i in range(num_rows):
+                    self.instruction_TABLE_cellChanged_callback(i,index)
+            else:
+                self.motor_max_limit_SB[index].setValue(self.left_pinna.get_motor_max_limit(index))
+                error_msg = QErrorMessage(self)
+                error_msg.showMessage("New max is greater than current angle!")
+                
+        elif self.selected_pinna_QB.currentText() == 'right':
+            if  self.right_pinna.set_motor_max_limit(index,new_value):
+                [min,max] = self.left_pinna.get_motor_limit(index)
+                self.motor_value_SLIDER[index].setRange(min,max)
+                self.motor_value_SB[index].setRange(min,max)
+                
+                num_rows = self.instruction_TABLE.rowCount()
+                for i in range(num_rows):
+                    self.instruction_TABLE_cellChanged_callback(i,index)
+            else:
+                self.motor_max_limit_SB[index].setValue(self.right_pinna.get_motor_max_limit(index))
+                error_msg = QErrorMessage(self)
+                error_msg.showMessage("New max is greater than current angle!")
         else:
-            self.motor_max_limit_SB[index].setValue(self.left_pinna.get_motor_max_limit(index))
-            error_msg = QErrorMessage(self)
-            error_msg.showMessage("New max is greater than current angle!")
+            if  self.right_pinna.set_motor_max_limit(index,new_value) and self.left_pinna.set_motor_max_limit(index,new_value):
+                [min,max] = self.left_pinna.get_motor_limit(index)
+                self.motor_value_SLIDER[index].setRange(min,max)
+                self.motor_value_SB[index].setRange(min,max)
+                
+                num_rows = self.instruction_TABLE.rowCount()
+                for i in range(num_rows):
+                    self.instruction_TABLE_cellChanged_callback(i,index)
+            else:
+                self.motor_max_limit_SB[index].setValue(self.right_pinna.get_motor_max_limit(index))
+                error_msg = QErrorMessage(self)
+                error_msg.showMessage("New max is greater than current angle!")
 
     def motor_min_limit_changed_CB(self,index):
         """callback when limit spinbox is changed
@@ -1165,19 +1597,46 @@ class BBGUI(QWidget):
         
         new_value = self.motor_min_limit_SB[index].value()
         
-        if self.left_pinna.set_motor_min_limit(index,new_value):
-            [min,max] = self.left_pinna.get_motor_limit(index)
-            self.motor_value_SLIDER[index].setRange(min,max)
-            self.motor_value_SB[index].setRange(min,max)
+        if self.selected_pinna_QB.currentText() == 'left':
+            if self.left_pinna.set_motor_min_limit(index,new_value):
+                [min,max] = self.left_pinna.get_motor_limit(index)
+                self.motor_value_SLIDER[index].setRange(min,max)
+                self.motor_value_SB[index].setRange(min,max)
 
-            num_rows = self.instruction_TABLE.rowCount()
-            for i in range(num_rows):
-                self.instruction_TABLE_cellChanged_callback(i,index)
+                num_rows = self.instruction_TABLE.rowCount()
+                for i in range(num_rows):
+                    self.instruction_TABLE_cellChanged_callback(i,index)
+            else:
+                self.motor_min_limit_SB[index].setValue(self.left_pinna.get_motor_min_limit(index))
+                error_msg = QErrorMessage(self)
+                error_msg.showMessage("New min is less than current angle!")
+                
+        elif self.selected_pinna_QB.currentText() == 'right':
+            if self.right_pinna.set_motor_min_limit(index,new_value):
+                [min,max] = self.right_pinna.get_motor_limit(index)
+                self.motor_value_SLIDER[index].setRange(min,max)
+                self.motor_value_SB[index].setRange(min,max)
+
+                num_rows = self.instruction_TABLE.rowCount()
+                for i in range(num_rows):
+                    self.instruction_TABLE_cellChanged_callback(i,index)
+            else:
+                self.motor_min_limit_SB[index].setValue(self.right_pinna.get_motor_min_limit(index))
+                error_msg = QErrorMessage(self)
+                error_msg.showMessage("New min is less than current angle!")
         else:
-            self.motor_min_limit_SB[index].setValue(self.left_pinna.get_motor_min_limit(index))
-            error_msg = QErrorMessage(self)
-            error_msg.showMessage("New min is less than current angle!")
-    
+            if self.right_pinna.set_motor_min_limit(index,new_value) and self.left_pinna.set_motor_min_limit(index,new_value):
+                [min,max] = self.right_pinna.get_motor_limit(index)
+                self.motor_value_SLIDER[index].setRange(min,max)
+                self.motor_value_SB[index].setRange(min,max)
+
+                num_rows = self.instruction_TABLE.rowCount()
+                for i in range(num_rows):
+                    self.instruction_TABLE_cellChanged_callback(i,index)
+            else:
+                self.motor_min_limit_SB[index].setValue(self.right_pinna.get_motor_min_limit(index))
+                error_msg = QErrorMessage(self)
+                error_msg.showMessage("New min is less than current angle!")
 #----------------------------------------------------------------------
     def init_echoControl_box(self):
         """Adds the sonar box layout"""
@@ -1208,10 +1667,7 @@ class BBGUI(QWidget):
         hLay = QHBoxLayout()
         self.leftPinnaeSpec = MplCanvas(self,width=5,height=4,dpi=100)
         self.leftPinnaeSpec.axes.set_title("Left Pinna")
-        Time_difference = 0.0001
-        Time_Array = np.linspace(0, 5, math.ceil(5 / Time_difference))
-        Data = 20*(np.sin(3 * np.pi * Time_Array))
-        self.leftPinnaeSpec.axes.specgram(Data,Fs=6,cmap="rainbow")
+
 
         
         hLay.addWidget(self.leftPinnaeSpec)
@@ -1220,10 +1676,6 @@ class BBGUI(QWidget):
         # right pinnae spectogram
         self.rightPinnaeSpec = MplCanvas(self,width=5,height=4,dpi=100)
         self.rightPinnaeSpec.axes.set_title("Right Pinna")
-        Time_difference = 0.0001
-        Time_Array = np.linspace(0, 5, math.ceil(5 / Time_difference))
-        Data = 20*(np.sin(3 * np.pi * Time_Array))
-        self.rightPinnaeSpec.axes.specgram(Data,Fs=6,cmap="rainbow")
 
         
         
@@ -1244,11 +1696,23 @@ class BBGUI(QWidget):
     def closeEvent(self,event):
         plt.close('all')
         try:
-            self.listener.teensy.close()
+            self.listener.disconnect_serial()
         except:
             pass
         try:
-            self.emitter.itsy.close()
+            self.emitter.disconnect_serial
+        except:
+            pass
+        
+        try:
+            self.gps.stop()
+            while self.gpsThread.is_alive():
+                self.gpsThread.join()
+        except:
+            pass
+        
+        try:
+            self.gps.disconnect_serial
         except:
             pass
         event.accept()
@@ -1257,20 +1721,23 @@ class RunInstructionsThread(QThread):
     cycle_complete = pyqtSignal(int)
     end_motor_angles = pyqtSignal(list)
 
-    def __init__(self,dataArray,freq,pinnae_obj: PinnaeController):
+    def __init__(self,dataArray,freq,l_pinna: PinnaeController, r_pinna: PinnaeController = None):
         QThread.__init__(self)
         self.data = dataArray
         self.timeBetween = 1/freq
         self.runThread = True
         self.curIndex = 0
         self.maxIndex = len(dataArray)
-        self.pinnae = pinnae_obj
+        self.l_pinna = l_pinna
+        self.r_pinna = r_pinna
         self.cycle_count = 0
         
     def run(self):
         logging.debug("RunInstructionsThread starting")
         while self.runThread:
-            self.pinnae.set_motor_angles(self.data[self.curIndex])
+            self.l_pinna.set_motor_angles(self.data[self.curIndex])
+            self.r_pinna.set_motor_angles(self.data[self.curIndex])
+            
             print(self.data[self.curIndex])
             self.curIndex+=1
             if self.curIndex >= self.maxIndex:
@@ -1280,7 +1747,7 @@ class RunInstructionsThread(QThread):
             
             time.sleep(self.timeBetween)
         
-        self.end_motor_angles.emit(self.pinnae.current_angles)
+        self.end_motor_angles.emit(self.l_pinna.current_angles)
         logging.debug("RunInstructionsThread exiting")
         
     def stop(self):

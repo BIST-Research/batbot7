@@ -73,6 +73,12 @@ class EchoRecorder:
         self.teensy = serial
         self.teensy.baudrate = 480e6
         self.teensy.timeout = 0.3
+        
+    def disconnect_serial(self):
+        try:
+            self.teensy.close()
+        except:
+            pass
     
     def write_cmd(self,cmd:LISTENER_SERIAL_CMD)->None:
         self.teensy.write(cmd.value)
