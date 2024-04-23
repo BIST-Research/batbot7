@@ -42,6 +42,7 @@ import time
 import queue
 import multiprocessing as mp
 from serial_helper import get_port_from_serial_num
+from datetime import datetime
 
 
 logging.basicConfig(level=logging.WARNING)
@@ -193,41 +194,19 @@ def process(raw, spec_settings, time_offs = 0):
 
             
 
-
-def plot_thread_function(plot_data:mp.Queue)->None:
-    
-    Fs = 1e6
-    NFFT = 512
-    noverlap = 400
-    spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
-    DB_range = 40
-    f_plot_bounds = (30E3, 100E3)
-    
-    fig,axes = plt.subplots(nrows=2,ncols=1)
-    plt.ion()
-    plt.show()
         
-    while True:    
-        while plot_data.empty:# and not should_stop.is_set():
-            data = plot_data.get()
-            L,R = data
         
-        # if should_stop.is_set():
-        #     return    
-        
-        spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
-        spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
-        plot_spec(axes[0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=False)
-        plot_spec(axes[0], fig, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=False)
-        plt.draw()
-        plt.pause(0.0001)
-        
+def get_current_experiment_time():
+    """Get the current time string that can be used as a file name or folder name"""
+    return datetime.now().strftime("experiment_%m-%d-%Y_%H-%M-%S%p")      
 
 
 
 class bb_repl(Cmd):
     """BatBot 7's repl interface class
     """
+    
+    dir_path = os.path.dirname(os.path.realpath(__file__))
     
     def __init__(self,yaml_cfg_file:str = 'bb_conf.yaml'):
         
@@ -248,6 +227,25 @@ class bb_repl(Cmd):
         self.phase_ears = False
         self.add_settable(Settable('phase_ears',bool,'when true pinnas move out of phase from each other',self))
         
+       
+        
+        # make experiments
+        if not os.path.exists(self.dir_path+"/experiments"):
+            os.makedirs(self.dir_path+"/experiments")
+            print("Made experiments folder")
+        else:
+            print("Experiments folder exists")
+            
+        self.curExperiment = get_current_experiment_time()
+        self.experiment_path = self.dir_path+"/experiments/"+self.curExperiment
+        os.makedirs(self.experiment_path)
+        
+        self.gps_dump_path = self.experiment_path+'/GPS'
+        os.makedirs(self.gps_dump_path)
+        
+        self.runs_path = self.experiment_path+'/RUNS'
+        os.makedirs(self.runs_path)
+        
         self._startup()
         
         
@@ -262,18 +260,7 @@ class bb_repl(Cmd):
         
         self.do_status(None)
 
-        
-                
-    def do_batt(self, _:Statement) ->None: 
-        """Returns the battery status of batbot
-        """
-        self.poutput('11.7v')
-        
-
-    def do_temp(self, _:Statement)->None:
-        """Returns the temperature of the batbot
-        """
-        self.poutput('73f OK')
+    
 
 
     def do_gui(self,args):
@@ -399,10 +386,10 @@ class bb_repl(Cmd):
     def do_status(self,args)->None:
         """Generate workup on microcontroller status's
         """
-        self.poutput(f"\nBattery:\t\tNA, \t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
-        self.poutput(f"Body Temp:\t\tNA, \t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
-        # self.poutput(f"\nBattery:\t\t11.8v, \t\t\t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
-        # self.poutput(f"Body Temp:\t\t75f, \t\t\t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+        # self.poutput(f"\nBattery:\t\tNA, \t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+        # self.poutput(f"Body Temp:\t\tNA, \t\t\t\t  {t_colors.FAIL}FAIL {t_colors.ENDC}")
+        # # self.poutput(f"\nBattery:\t\t11.8v, \t\t\t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
+        # # self.poutput(f"Body Temp:\t\t75f, \t\t\t\t  {t_colors.OKGREEN}OK {t_colors.ENDC}")
         
         baud = self.bb_config['emit_MCU']['baud']
         sn = self.bb_config['emit_MCU']['serial_num']
@@ -452,29 +439,29 @@ class bb_repl(Cmd):
         
         bus = self.bb_config['left_pinnae_MCU']['bus']
         ss = self.bb_config['left_pinnae_MCU']['ss']
-        try:
-            if self.L_pinna_MCU.com_type == pinnae.COM_TYPE.NONE:
-                self.L_pinna_MCU.config_spi(bus,ss)
+        # try:
+        #     if self.L_pinna_MCU.com_type == pinnae.COM_TYPE.NONE:
+        #         self.L_pinna_MCU.config_spi(bus,ss)
             
-            if not self.L_pinna_MCU.get_ack():
-                raise
+        #     if not self.L_pinna_MCU.get_ack():
+        #         raise
             
-            self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
-        except:
-            self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
+        self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
+        # except:
+        #     self.poutput(f"Left Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
 
         bus = self.bb_config['right_pinnae_MCU']['bus']
         ss = self.bb_config['right_pinnae_MCU']['ss']
-        try:
-            if self.R_pinna_MCU.com_type == pinnae.COM_TYPE.NONE:
-                self.R_pinna_MCU.config_spi(bus,ss)
+        # try:
+        #     if self.R_pinna_MCU.com_type == pinnae.COM_TYPE.NONE:
+        #         self.R_pinna_MCU.config_spi(bus,ss)
             
-            if not self.R_pinna_MCU.get_ack():
-                raise
+        #     if not self.R_pinna_MCU.get_ack():
+        #         raise
             
-            self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
-        except:
-            self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
+        self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.OKGREEN} OK {t_colors.ENDC} ")
+        # except:
+        #     self.poutput(f"Right Pinna MCU-SPI:\tbus:{bus} ss:{ss}, \t\t\t {t_colors.FAIL} FAIL {t_colors.ENDC} ")
             
         
         # self.poutput(f"{t_colors.FAIL}\t LIMITED CAPABILITIES{t_colors.ENDC}")
@@ -499,9 +486,15 @@ class bb_repl(Cmd):
         Args:
             args (_type_): _description_
         """
-
-        _,L,R = self.record_MCU.listen(args.listen_time_ms)
+        cur_time = self.get_current_time_str()
+        cur_dir = self.runs_path+f"/LISTEN_{cur_time}"
+        os.makedirs(cur_dir)
         
+        _,L,R = self.record_MCU.listen(args.listen_time_ms)
+        np.save(cur_dir+f"/left_ear.npy",L)
+        np.save(cur_dir+f"/right_ear.npy",R)
+        self.emitter.save_chirp_info(cur_dir+"/chirp_info.txt")
+            
         # L = butter_bandpass_filter(L,30e3,100e3,fs=1e6)
         # R = butter_bandpass_filter(R,30e3,100e3,fs=1e6)
         
@@ -562,11 +555,10 @@ class bb_repl(Cmd):
     run_parser = Cmd2ArgumentParser()
     run_parser.add_argument('-lt','--listen_time_ms',type=int,help="Time to listen for in ms",default=30)
     run_parser.add_argument('-p','--plot',action='store_true',help="Plot the results")
-    run_parser.add_argument('-fft','--fft',action='store_true',help="Plot the fft")
-    run_parser.add_argument('-spec','--spec',action='store_true',help="Plot the spec")
+    run_parser.add_argument('-pf','--plot_freq',help="how often to plot the spec", default=5)
     run_parser.add_argument('-nc','--num_chirps',type=int,help='times to chirp',default=30)
-    run_parser.add_argument('-to','--time_off',type=int,default=0)
-    # run_parser.add_argument('chirp_file',required=False)
+    run_parser.add_argument('-to','--time_off',type=int,default=3000)
+
     @with_argparser(run_parser)
     def do_run(self,args):
         """Listen for echos 
@@ -574,11 +566,7 @@ class bb_repl(Cmd):
         Args:
             args (_type_): _description_
         """
-        # plot_q = mp.Queue()
-        # plot_stop = mp.Event()
 
-        # plot_p = mp.Process(target=plot_thread_function,args=(plot_q,))
-        # plot_p.start()
         
         fig, axes = plt.subplots(nrows=2, figsize=(9,7))
         plt.subplots_adjust(left=0.1,
@@ -597,17 +585,25 @@ class bb_repl(Cmd):
         f_plot_bounds = (30E3, 100E3)
         
         show_db = True
+        
+        cur_time = self.get_current_time_str()
+        cur_dir = self.runs_path+f"/RUN_{cur_time}"
+        os.makedirs(cur_dir)
+        self.emitter.save_chirp_info(cur_dir+"/chirp_info.txt")
         while True:
             _,L,R = self.record_MCU.listen(args.listen_time_ms)
+            
+            np.save(cur_dir+f"/left_ear_{count}.npy",L)
+            np.save(cur_dir+f"/right_ear_{count}.npy",R)
 
-            if count % 5 == 0:
-                spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=0)
-                spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=0)
+            if args.plot and count % args.plot_freq == 0:
+                spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=args.time_off)
+                spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=args.time_off)
                 plot_spec(axes[0], fig, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',plot_db=show_db)
                 plot_spec(axes[1], fig, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Ear',plot_db=show_db)
                 show_db = False
                 plt.draw()
-                plt.pause(0.001)
+                plt.pause(0.0001)
                 # plot_q.put([L,R])
 
             

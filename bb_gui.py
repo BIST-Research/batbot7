@@ -496,28 +496,42 @@ class BBGUI(QWidget):
         chirp_grid.addWidget(QLabel("Type:"),1,2)
         chirp_grid.addWidget(self.chirp_type_CB,1,3)
         
+        # gain of chirp
+        self.chirp_gain_SB = QSpinBox()
+        self.chirp_gain_SB.setRange(1,4096)
+        self.chirp_gain_SB.setValue(512)
+        self.chirp_gain_SB.setPrefix("Gain ")
+        chirp_grid.addWidget(self.chirp_gain_SB,0,6)
+        
+        # offset of chirp
+        self.chirp_offset_SB = QSpinBox()
+        self.chirp_offset_SB.setRange(1,4096)
+        self.chirp_offset_SB.setValue(2048)
+        self.chirp_offset_SB.setPrefix("Offset ")
+        chirp_grid.addWidget(self.chirp_offset_SB,1,6)
+        
         
         # upload to board
         self.upload_chirp_PB = QPushButton("Upload")
         self.upload_chirp_PB.clicked.connect(self.upload_chirp_PB_Clicked)
-        chirp_grid.addWidget(self.upload_chirp_PB,0,6)
+        chirp_grid.addWidget(self.upload_chirp_PB,0,7)
         
-        self.chirp_PB = QPushButton("CHIRP")
-        self.chirp_PB.clicked.connect(self.chirp_PB_Clicked)
-        chirp_grid.addWidget(self.chirp_PB,1,6)
+        self.run_PB = QPushButton("RUN")
+        self.run_PB.clicked.connect(self.run_PB_Clicked)
+        chirp_grid.addWidget(self.run_PB,1,7)
         
         self.times_to_chirp_SB = QSpinBox()
         self.times_to_chirp_SB.setSuffix(' chirps')
         self.times_to_chirp_SB.setRange(1,2000)
         self.times_to_chirp_SB.setValue(30)
-        chirp_grid.addWidget(self.times_to_chirp_SB,0,7)
+        chirp_grid.addWidget(self.times_to_chirp_SB,0,8)
         
         self.time_to_listen_SB = QSpinBox()
         self.time_to_listen_SB.setPrefix('listen: ')
         self.time_to_listen_SB.setSuffix(' ms')
         self.time_to_listen_SB.setRange(1,30000)
         self.time_to_listen_SB.setValue(30)
-        chirp_grid.addWidget(self.time_to_listen_SB,1,7)
+        chirp_grid.addWidget(self.time_to_listen_SB,1,8)
 
         
         
@@ -810,6 +824,10 @@ class BBGUI(QWidget):
         """Get the current time string that can be used as a file name or folder name"""
         return datetime.now().strftime("experiment_%m-%d-%Y_%H-%M-%S%p")
     
+    def get_current_time_str(self)->str:
+        return datetime.now().strftime("%H_%M_%S")
+        
+    
     def experiment_folder_name_TE_contextMenu(self,position):
         """Custom context menu for experiment folder name"""
         context_menu = QMenu()
@@ -833,14 +851,17 @@ class BBGUI(QWidget):
             win.showMessage("EMITTER IS NOT CONNECTED!")
             return
         
+        gain = self.chirp_gain_SB.value()
+        offset = self.chirp_offset_SB.value()
+        
         fs = self.chirp_start_freq_SB.value()
         fe = self.chirp_stop_freq_SB.value()
         tend = self.chirp_duration_SB.value()
         meth = self.chirp_type_CB.currentText()
-        s,t = self.emitter.gen_chirp(fs*1e3,fe*1e3,tend,method=meth)
+        s,t = self.emitter.gen_chirp(fs*1e3,fe*1e3,tend,method=meth,gain=float(gain),offset=float(offset))
         self.emitter.upload_chirp(s)
         
-    def chirp_PB_Clicked(self):
+    def run_PB_Clicked(self):
         """ """
         
         if not self.listener_connect_PB.isChecked():
@@ -860,12 +881,20 @@ class BBGUI(QWidget):
         listen_time = self.time_to_listen_SB.value()
         times_to_chirp = self.times_to_chirp_SB.value()
         
-
+        
+        
+        cur_time = self.get_current_time_str()
+        cur_dir = self.runs_path+f"/{cur_time}"
+        os.makedirs(cur_dir)
+        self.emitter.save_chirp_info(cur_dir+"/chirp_info.txt")
+        
         while True:
             raw,L,R = self.listener.listen(listen_time)
             
-            np.save(self.runs_path+f"/left_ear_{count}.npy",L)
-            np.save(self.runs_path+f"/right_ear_{count}.npy",R)
+            np.save(cur_dir+f"/left_ear_{count}.npy",L)
+            np.save(cur_dir+f"/right_ear_{count}.npy",R)
+            # np.save(self.runs_path+f"/left_ear_{count}.npy",L)
+            # np.save(self.runs_path+f"/right_ear_{count}.npy",R)
             
             time_off = int(self.time_off_SB.value()*1000)
             times_plot = self.plot_frequency_SB.value()
@@ -1070,9 +1099,9 @@ class BBGUI(QWidget):
         table_side_grid.addWidget(self.load_movements_PB,1,0)
         
         # HOME 
-        self.home_pinnas_PB = QPushButton("HOME")
-        
-        table_side_grid.addWidget(self.home_pinnas_PB,1,1)
+        self.save_movements_PB = QPushButton("SAVE")
+        self.save_movements_PB.pressed.connect(self.save_movements_PB_cb)
+        table_side_grid.addWidget(self.save_movements_PB,1,1)
     
         
         # create start button
@@ -1120,6 +1149,41 @@ class BBGUI(QWidget):
         self.pinnae_controls_GB.setLayout(vertical_layout)
         self.mainVLay.addWidget(self.pinnae_controls_GB)
     
+    def save_movements_PB_cb(self):
+        fd = QFileDialog(self)
+
+        file_path,_ = fd.getSaveFileName(None, "Save movements","","YAML Files (*.yaml)")
+        
+        if file_path:
+            num_rows = self.instruction_TABLE.rowCount()
+            
+            array_2d = [[0] * NUM_PINNAE for _ in range(num_rows)]
+            
+            for row in range(num_rows):
+                for col in range(NUM_PINNAE):
+                    data = self.instruction_TABLE.item(row,col)
+                    array_2d[row][col] = int(data.text())
+                    
+            data = {
+                'pinna_movements': {
+                    'speed': self.intstruction_speed_SB.value(),
+                    'angles': 
+                        array_2d
+                }
+            }
+            
+                
+            splitted = file_path.split(".")
+            file_path = splitted[0]+"_PM.yaml" 
+            print(f" save path {file_path}")
+        
+                
+            with open(file_path,'w') as f:
+                yaml.dump(data,f)
+        else:
+            print("no save")    
+    
+    
     def load_movements_PB_cb(self):
         fd = QFileDialog(self)
         fd.setWindowTitle("Open File")
@@ -1153,7 +1217,8 @@ class BBGUI(QWidget):
                         newItem = QTableWidgetItem()
                         newItem.setData(0,int( angle ))
                         self.instruction_TABLE.setItem(row,col,newItem)    
-                         
+                
+                self.intstruction_speed_SB.setValue(int(yam_file["pinna_movements"]["speed"]))
                         
                     
                     
@@ -1179,6 +1244,8 @@ class BBGUI(QWidget):
         set_zero = context_menu.addAction("Set Zero")
         max_value = context_menu.addAction("Max")
         min_value = context_menu.addAction("Min")
+        cw_home_value = context_menu.addAction("HOME CW")
+        ccw_home_value = context_menu.addAction("HOME CCW")
         
         action = context_menu.exec(self.motor_GB[index].mapToGlobal(position))
         
@@ -1188,6 +1255,30 @@ class BBGUI(QWidget):
             self.motor_max_PB_pressed(index)
         elif action == min_value:
             self.motor_min_PB_pressed(index)
+        elif action == cw_home_value:
+            if self.selected_pinna_QB.currentText() == 'left':
+                self.left_pinna.move_to_min(index,move_cw=True)
+            elif self.selected_pinna_QB.currentText() == 'right':
+                self.right_pinna.move_to_min(index,move_cw=True)
+            elif self.selected_pinna_QB.currentText() == 'both':
+                self.left_pinna.move_to_min(index,move_cw=True)
+                self.right_pinna.move_to_min(index,move_cw=True)
+                
+            self.motor_value_SB[index].setValue(0)
+            self.motor_value_SLIDER[index].setValue(0)
+                
+        elif action == ccw_home_value:
+            if self.selected_pinna_QB.currentText() == 'left':
+                self.left_pinna.move_to_min(index,move_cw=False)
+                self.left
+            elif self.selected_pinna_QB.currentText() == 'right':
+                self.right_pinna.move_to_min(index,move_cw=False)
+            elif self.selected_pinna_QB.currentText() == 'both':
+                self.left_pinna.move_to_min(index,move_cw=False)
+                self.right_pinna.move_to_min(index,move_cw=False)
+            
+            self.motor_value_SB[index].setValue(0)
+            self.motor_value_SLIDER[index].setValue(0)
             
         
     def set_motor_GB_enabled(self, enabled:bool)->None:

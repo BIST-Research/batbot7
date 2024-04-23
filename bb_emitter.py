@@ -25,6 +25,11 @@ class ECHO_SERIAL_CMD(Enum):
     START_AMP = 8
     STOP_AMP = 9
     CLEAR_SERIAL = 10
+    
+class LAST_CHIRP_DATA(Enum):
+    FILE = 0
+    CUSTOM = 1
+    NONE = 3
 
 def hide_cursor():
     sys.stdout.write("\033[?25l")  # Hide cursor
@@ -34,13 +39,7 @@ def show_cursor():
     sys.stdout.write("\033[?25h")  # Show cursor
     sys.stdout.flush()
 
-def check_and_get_numpy_file(file_name:str,gain:float = 512,offset = 2048)->np.uint16:
-    if not os.path.exists(file_name):
-        print(f"File does not exist!")
-        return None
-    data = np.load(file_name)
-    data = convert_and_range_data(data)
-    return data
+
 
 
 class t_colors:
@@ -70,6 +69,12 @@ class EchoEmitter:
         self.output_t = 1/output_freq
         
         self.chirp_uploaded = False
+        self.last_upload_type = LAST_CHIRP_DATA.NONE
+        self.last_f0 = 0
+        self.last_f1 = 0
+        self.last_tend = 0
+        self.last_method = 0
+        self.last_filename = ""
         
         self.SIG_GAIN = 512
         self.SIG_OFFSET = 2048
@@ -81,6 +86,8 @@ class EchoEmitter:
         self.itsy.timeout = 0.5
         self.connection_status()
         self.get_max_chirp_uint16_length()
+        
+
         
     def disconnect_serial(self):
         try:
@@ -171,10 +178,9 @@ class EchoEmitter:
             print(f"{t_colors.FAIL}FAILED TO CHIRP {msg}{t_colors.ENDC}")
             return False
 
-    def upload_chirp(self,data:np.uint16 = None, file:str = None,verify:bool = True)->bool:
+    def upload_chirp(self,data:np.uint16 = None)->bool:
         self.itsy.flush()
         if not self.connection_status():
-            
             return False
         
         if not self.max_chirp_length:
@@ -244,7 +250,7 @@ class EchoEmitter:
             return
         
         # verify the chirp by reading it back
-        print("Validating data.. HASH OK")
+        print("Validating hash...")
         crc_back = self.itsy.read(4)
         crc_back = (crc_back[0] | (crc_back[1]<<8) | (crc_back[2] << 16) | (crc_back[3] << 24))
 
@@ -259,7 +265,7 @@ class EchoEmitter:
         self.chirp_uploaded = True
         self.EMIT_TIME = data_len
 
-
+ 
     def get_max_chirp_uint16_length(self) -> np.uint16:
         if not self.connection_status():
             return False
@@ -289,6 +295,12 @@ class EchoEmitter:
         chirp = signal.chirp(t,f_start,t_end*1e-3,f_end,method)
         chirp = self.convert_and_range_data(chirp,gain,offset)
 
+        self.last_upload_type = LAST_CHIRP_DATA.CUSTOM
+        self.last_f0 = f_start
+        self.last_f1 = f_end
+        self.last_tend = t_end
+        self.last_method = method
+        
         return [chirp,t]
     
     def gen_sine(self,time_ms:np.uint16, freq:np.uint16,gain:float = None,offset = None)->tuple[np.uint16,np.ndarray]:
@@ -299,6 +311,12 @@ class EchoEmitter:
         
         sin_wave = np.sin(2 * np.pi * freq *t)
         sin_wave = self.convert_and_range_data(sin_wave,gain,offset)
+        
+        self.last_upload_type = LAST_CHIRP_DATA.CUSTOM
+        self.last_f0 = freq
+        self.last_f1 = freq
+        self.last_tend = time_ms
+        self.last_method = 'Sine wave'
         
         return [sin_wave,t]
     
@@ -316,6 +334,7 @@ class EchoEmitter:
             
         data = data*g + of
         
+
         return data.astype(np.uint16)
     
     def get_and_convert_numpy(self,file_name:str,gain:float = None,offset = None)->np.uint16:
@@ -324,8 +343,26 @@ class EchoEmitter:
             return None
         data = np.load(file_name)
         data = self.convert_and_range_data(data,gain,offset)
+        
+        self.last_upload_type = LAST_CHIRP_DATA.FILE
+        self.last_filename = file_name
         return data
 
+    def save_chirp_info(self,file_path:str)->bool:
+        if not file_path.endswith(".txt"):
+            file_path += ".txt"
+            
+        with open(file_path,"w") as f:
+            f.write(f"ECHO_DATA:\n")
+            if self.last_upload_type == LAST_CHIRP_DATA.CUSTOM:
+                f.write(f"START FREQ: {self.last_f0} END FREQ: {self.last_f1} DURATION MS: {self.last_tend} METHOD: {self.last_method}\n")
+            elif self.last_upload_type == LAST_CHIRP_DATA.FILE:
+                f.write(f"FILE USED: {self.last_filename}")
+            else:
+                f.write(f"WARNING UNKNOWN CHIRP!!\n")
+                return False
+        
+        return True
         
 
 

@@ -105,19 +105,62 @@ class PinnaeController:
         
     def get_ack(self)->bool:
         return False
+    
+    def reset_zero_position(self,index:np.uint16)->None:
+        
+        write_data = bytearray((NUM_PINNAE_MOTORS*2)+1)
+        
+        write_data[0] = 0x80 | index
+        
+        if self.com_type == COM_TYPE.SPI:
+            if self.spi:
+                self.spi.xfer2(write_data)
+            else:
+                logging.error("SPI NOT CONNECTED!")
+                self.com_type = COM_TYPE.NONE
+        elif self.com_type == COM_TYPE.UART:
+            if self.serial and self.serial.is_open:
+                self.serial.write(write_data)
+            else:
+                logging.error("UART NOT CONNECTED!")
+                self.com_type == COM_TYPE.NONE
+        else:
+            logging.error("NO COM TYPE SELECTED CHOOSE UART OR SPI!")
+    
+    def move_to_min(self,index:np.uint8, move_cw:bool = True)->None:
+        write_data = bytearray((NUM_PINNAE_MOTORS*2) +1)
+        
+        if move_cw:
+            cw_flag = 0x20
+        else:
+            cw_flag = 0x00
+            
+        write_data[0] = 0x40 | index | cw_flag
+        if self.com_type == COM_TYPE.SPI:
+            if self.spi:
+                self.spi.xfer2(write_data)
+            else:
+                logging.error("SPI NOT CONNECTED!")
+                self.com_type = COM_TYPE.NONE
+        elif self.com_type == COM_TYPE.UART:
+            if self.serial and self.serial.is_open:
+                self.serial.write(write_data)
+            else:
+                logging.error("UART NOT CONNECTED!")
+                self.com_type == COM_TYPE.NONE
+        else:
+            logging.error("NO COM TYPE SELECTED CHOOSE UART OR SPI!")
+            
 
-    def send_MCU_angles(self,zero_index = -1) -> None:
+    def send_MCU_angles(self) -> None:
         """Sends all 7 of the angles to the Grand Central, 
         in a fashion of 2 bytes for each motor angle. The original 
         angles are represented as signed 16 int, here we break them into 
         bytes and send them
 
         """
-        data_buffer = np.zeros( NUM_PINNAE_MOTORS*2 +1,dtype=np.uint8)
-
-        # first index is for setting telling MCU to use its current encoder 
-        # angle as the zero, we will just set for zero
-        data_buffer[0] = zero_index+1
+        # data_buffer = np.zeros( NUM_PINNAE_MOTORS*2 +1,dtype=np.uint8)
+        data_buffer = bytearray((NUM_PINNAE_MOTORS*2)+1)
         
         # first motor
         data_buffer[1] = (self.current_angles[0] >> 8) & 0xff
@@ -148,18 +191,18 @@ class PinnaeController:
         data_buffer[14] =  self.current_angles[6] & 0xff
         
         # convert the data to list so we can send it
-        write_data = data_buffer.tolist()
+        # write_data = data_buffer.tolist()
     
         
         if self.com_type == COM_TYPE.SPI:
             if self.spi:
-                self.spi.xfer2(write_data)
+                self.spi.xfer2(data_buffer)
             else:
                 logging.error("SPI NOT CONNECTED!")
                 self.com_type = COM_TYPE.NONE
         elif self.com_type == COM_TYPE.UART:
             if self.serial and self.serial.is_open:
-                self.serial.write(write_data)
+                self.serial.write(data_buffer)
             else:
                 logging.error("UART NOT CONNECTED!")
                 self.com_type == COM_TYPE.NONE
@@ -329,7 +372,8 @@ class PinnaeController:
         # this has not been implemented yet but will basically send MCU 
         # tells the MCU this is the new zero point
         self.current_angles[motor_index] = 0
-        self.send_MCU_angles(motor_index)
+        # self.send_MCU_angles(motor_index)
+        self.reset_zero_position(motor_index)
         
         logging.debug(f"Setting motor: {motor_index} new zero position")
         
