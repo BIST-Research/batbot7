@@ -484,6 +484,7 @@ class BBGUI(QWidget):
         self.chirp_duration_SB.setValue(3)
         self.chirp_duration_SB.setRange(1,65)
         self.chirp_duration_SB.setSuffix(" mS")
+        self.chirp_duration_SB.editingFinished.connect(self.chirp_duration_SB_ef_cb)
         chirp_grid.addWidget(QLabel("Duration:"),0,2)
         chirp_grid.addWidget(self.chirp_duration_SB,0,3)
         
@@ -551,6 +552,8 @@ class BBGUI(QWidget):
         self.experiment_settings_GB.setLayout(hLay)
         self.mainVLay.addWidget(self.experiment_settings_GB)
         
+        
+        
     def populate_serial_ports_CB(self,box:ComboBox):
         available_ports = QSerialPortInfo.availablePorts()
         if len(available_ports) == 0:
@@ -567,7 +570,9 @@ class BBGUI(QWidget):
             if curIndex != -1 and port_info.portName() == cur_port:
                 box.setCurrentIndex(i)
             
-        
+    def chirp_duration_SB_ef_cb(self)->None:
+        self.time_off_SB.setValue(self.chirp_duration_SB.value()+0.5)
+    
         
     def connect_uart_PB_CB(self, cb:ComboBox,pb:QPushButton):
         # have to append for linux based systems
@@ -1730,6 +1735,7 @@ class BBGUI(QWidget):
         self.time_off_SB.setDecimals(2)
         self.time_off_SB.setSingleStep(0.25)
         settings_lay.addWidget(self.time_off_SB)
+        self.chirp_duration_SB_ef_cb()
 
         vLay.addLayout(settings_lay)
 
