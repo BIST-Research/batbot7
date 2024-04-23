@@ -247,6 +247,7 @@ class BBGUI(QWidget):
             self.motor_min_limit_changed_CB(i)
             self.motor_max_limit_changed_CB(i)
 
+        self.selected_pinna_QB.setCurrentText("both")
         
         
         
