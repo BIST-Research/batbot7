@@ -1136,6 +1136,11 @@ class BBGUI(QWidget):
         self.cycle_counter_SB = QSpinBox()
         self.cycle_counter_SB.setEnabled(False)
         table_side_grid.addWidget(self.cycle_counter_SB,3,1)
+        
+        # out of phase option
+        self.ear_phase_CB = QCheckBox("PHASE EARS")
+        self.ear_phase_CB.pressed.connect(self.ear_phase_CB_cb)
+        table_side_grid.addWidget(self.ear_phase_CB,4,0)
 
         # add context menu for instruction table
         self.instruction_TABLE.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -1163,6 +1168,10 @@ class BBGUI(QWidget):
         
         self.pinnae_controls_GB.setLayout(vertical_layout)
         self.mainVLay.addWidget(self.pinnae_controls_GB)
+    
+    def ear_phase_CB_cb(self):
+        
+        pass
     
     def save_movements_PB_cb(self):
         fd = QFileDialog(self)
@@ -1570,7 +1579,15 @@ class BBGUI(QWidget):
             
             else:
                 self.left_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
-                self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
+                if self.ear_phase_CB.isChecked():
+                    if index < 3:
+                        max = self.motor_min_limit_SB[index].value()*-1
+                        self.right_pinna.set_motor_angle(index, max + self.motor_value_SB[index].value())
+                    else:
+                        max = self.motor_max_limit_SB[index].value()
+                        self.right_pinna.set_motor_angle(index, max - self.motor_value_SB[index].value())
+                else:   
+                    self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
 
         
         
@@ -1591,7 +1608,16 @@ class BBGUI(QWidget):
             
             else:
                 self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
-                self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                # self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                if self.ear_phase_CB.isChecked():
+                     if index < 3:
+                         max = self.motor_min_limit_SB[index].value()*-1
+                         self.right_pinna.set_motor_angle(index, max + self.motor_value_SB[index].value())
+                     else:
+                         max = self.motor_max_limit_SB[index].value()
+                         self.right_pinna.set_motor_angle(index, max - self.motor_value_SB[index].value())
+                else:   
+                     self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
     
     
     def motor_set_zero_PB_callback(self,index):
