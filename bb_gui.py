@@ -192,6 +192,7 @@ class BBGUI(QWidget):
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
 
+
     def __init__(self,emitter:bb_emitter = None,listener:bb_listener=None, l_pinna:PinnaeController=None, r_pinna:PinnaeController=None):
         """Adds all the widgets to GUI"""
         QWidget.__init__(self)
@@ -236,8 +237,16 @@ class BBGUI(QWidget):
         self.connect_MCUs()
         
         for i in range(NUM_PINNAE):
+            if i < 3:
+                self.motor_min_limit_SB[i].setValue(-90)
+                self.motor_max_limit_SB[i].setValue(0)
+            else:
+                self.motor_min_limit_SB[i].setValue(0)
+                self.motor_max_limit_SB[i].setValue(90)
+                
             self.motor_min_limit_changed_CB(i)
             self.motor_max_limit_changed_CB(i)
+
         
         
         

@@ -53,7 +53,7 @@ class PinnaeController:
         if spiObj != None:
             self.com_type = COM_TYPE.SPI
             self.spi.mode = 0
-            self.spi.max_speed_hz = 25000000
+            self.spi.max_speed_hz = 10000000
             logging.debug("Using SPI object")
         elif serial_dev != None:
             self.com_type = COM_TYPE.UART
@@ -101,7 +101,7 @@ class PinnaeController:
         self.com_type = COM_TYPE.SPI
         self.spi = spi
         self.spi.mode = 0
-        self.spi.max_speed_hz = 25000000
+        self.spi.max_speed_hz = 10000000
         
     def get_ack(self)->bool:
         return False
@@ -110,7 +110,7 @@ class PinnaeController:
         
         write_data = bytearray((NUM_PINNAE_MOTORS*2)+1)
         
-        write_data[0] = 0x80 | index
+        write_data[0] = (0x80) | index
         
         if self.com_type == COM_TYPE.SPI:
             if self.spi:
