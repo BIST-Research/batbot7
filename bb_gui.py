@@ -238,11 +238,11 @@ class BBGUI(QWidget):
         
         for i in range(NUM_PINNAE):
             if i < 3:
-                self.motor_min_limit_SB[i].setValue(-90)
+                self.motor_min_limit_SB[i].setValue(-170)
                 self.motor_max_limit_SB[i].setValue(0)
             else:
                 self.motor_min_limit_SB[i].setValue(0)
-                self.motor_max_limit_SB[i].setValue(90)
+                self.motor_max_limit_SB[i].setValue(170)
                 
             self.motor_min_limit_changed_CB(i)
             self.motor_max_limit_changed_CB(i)
