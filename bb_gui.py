@@ -1637,7 +1637,7 @@ class BBGUI(QWidget):
                 else:
                     if index == 6:
                         self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
-                    if index == 7:    
+                    elif index == 7:    
                         self.right_pinna.set_motor_angle(6, self.motor_value_SLIDER[index].value()*mult)
                     
                 # if self.ear_phase_CB.isChecked():
