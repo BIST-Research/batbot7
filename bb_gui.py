@@ -238,11 +238,11 @@ class BBGUI(QWidget):
         
         for i in range(NUM_PINNAE):
             if i < 3:
-                self.motor_min_limit_SB[i].setValue(-170)
-                self.motor_max_limit_SB[i].setValue(0)
-            else:
                 self.motor_min_limit_SB[i].setValue(0)
                 self.motor_max_limit_SB[i].setValue(170)
+            else:
+                self.motor_min_limit_SB[i].setValue(-170)
+                self.motor_max_limit_SB[i].setValue(0)
                 
             self.motor_min_limit_changed_CB(i)
             self.motor_max_limit_changed_CB(i)
@@ -1288,8 +1288,12 @@ class BBGUI(QWidget):
                 self.left_pinna.move_to_min(index,move_cw=True)
                 self.right_pinna.move_to_min(index,move_cw=True)
                 
+            self.motor_value_SB[index].blockSignals()
+            self.motor_value_SLIDER[index].blockSignals()
             self.motor_value_SB[index].setValue(0)
             self.motor_value_SLIDER[index].setValue(0)
+            self.motor_value_SB[index].blockSignals(False)
+            self.motor_value_SLIDER[index].blockSignals(False)
                 
         elif action == ccw_home_value:
             if self.selected_pinna_QB.currentText() == 'left':
@@ -1301,8 +1305,12 @@ class BBGUI(QWidget):
                 self.left_pinna.move_to_min(index,move_cw=False)
                 self.right_pinna.move_to_min(index,move_cw=False)
             
+            self.motor_value_SB[index].blockSignals()
+            self.motor_value_SLIDER[index].blockSignals()
             self.motor_value_SB[index].setValue(0)
             self.motor_value_SLIDER[index].setValue(0)
+            self.motor_value_SB[index].blockSignals(False)
+            self.motor_value_SLIDER[index].blockSignals(False)
             
         
     def set_motor_GB_enabled(self, enabled:bool)->None:
