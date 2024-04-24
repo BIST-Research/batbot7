@@ -238,15 +238,15 @@ class BBGUI(QWidget):
         self.connect_MCUs()
         
         for i in range(NUM_PINNAE):
-            # if i < 3:
-            #     self.motor_min_limit_SB[i].setValue(0)
-            #     self.motor_max_limit_SB[i].setValue(170)
-            # else:
-            #     self.motor_min_limit_SB[i].setValue(-170)
-            #     self.motor_max_limit_SB[i].setValue(0)
+            if i < 3:
+                self.motor_min_limit_SB[i].setValue(0)
+                self.motor_max_limit_SB[i].setValue(170)
+            else:
+                self.motor_min_limit_SB[i].setValue(-170)
+                self.motor_max_limit_SB[i].setValue(0)
             
-            self.motor_min_limit_SB[i].setValue(0)
-            self.motor_max_limit_SB[i].setValue(170)
+            # self.motor_min_limit_SB[i].setValue(0)
+            # self.motor_max_limit_SB[i].setValue(170)
                 
             self.motor_min_limit_changed_CB(i)
             self.motor_max_limit_changed_CB(i)
@@ -1590,10 +1590,11 @@ class BBGUI(QWidget):
                 self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
             
             else:
-                if index >= 3:
-                    mult = -1
-                else:
-                    mult = 1
+                # if index >= 3:
+                #     mult = -1
+                # else:
+                #     mult = 1
+                mult = 1
                 self.left_pinna.set_motor_angle(index, self.motor_value_SB[index].value()*mult)
                 self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value()*mult)
                 # if self.ear_phase_CB.isChecked():
@@ -1624,10 +1625,11 @@ class BBGUI(QWidget):
                 self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
             
             else:
-                if index >= 3:
-                    mult = -1
-                else:
-                    mult = 1
+                # if index >= 3:
+                #     mult = -1
+                # else:
+                #     mult = 1
+                mult = 1
                     
                 if index != 7 or index != 6:
                     self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
