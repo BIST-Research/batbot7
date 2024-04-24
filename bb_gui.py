@@ -225,6 +225,7 @@ class BBGUI(QWidget):
             print("Experiments folder exists")
             
 
+        self.selected_pinna_QB.setCurrentText("both")
         self.experiment_path = self.dir_path+"/experiments/"+self.curExperiment
         os.makedirs(self.experiment_path)
         
@@ -250,7 +251,6 @@ class BBGUI(QWidget):
             self.motor_min_limit_changed_CB(i)
             self.motor_max_limit_changed_CB(i)
 
-        self.selected_pinna_QB.setCurrentText("both")
         
         
         
