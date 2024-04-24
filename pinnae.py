@@ -108,19 +108,47 @@ class PinnaeController:
     
     def reset_zero_position(self,index:np.uint16)->None:
         
-        write_data = bytearray((NUM_PINNAE_MOTORS*2)+1)
+        data_buffer = bytearray((NUM_PINNAE_MOTORS*2)+1)
         
-        write_data[0] = (0x80) | index
+        data_buffer[0] = (0x80) | index
+        
+        # first motor
+        data_buffer[1] = (self.current_angles[0] >> 8) & 0xff
+        data_buffer[2] =  self.current_angles[0] & 0xff
+        
+        # second motor
+        data_buffer[3] = (self.current_angles[1] >> 8) & 0xff
+        data_buffer[4] =  self.current_angles[1] & 0xff
+        
+        # third motor
+        data_buffer[5] = (self.current_angles[2] >> 8) & 0xff
+        data_buffer[6] =  self.current_angles[2] & 0xff
+        
+        # fourth motor
+        data_buffer[7] = (self.current_angles[3] >> 8) & 0xff
+        data_buffer[8] =  self.current_angles[3] & 0xff
+        
+        # fifth motor
+        data_buffer[9] = (self.current_angles[4] >> 8) & 0xff
+        data_buffer[10] = self.current_angles[4] & 0xff
+        
+        # sixth motor
+        data_buffer[11] = (self.current_angles[5] >> 8) & 0xff
+        data_buffer[12] =  self.current_angles[5] & 0xff
+        
+        # seventh motor
+        data_buffer[13] = (self.current_angles[6] >> 8) & 0xff
+        data_buffer[14] =  self.current_angles[6] & 0xff
         
         if self.com_type == COM_TYPE.SPI:
             if self.spi:
-                self.spi.xfer2(write_data)
+                self.spi.xfer2(data_buffer)
             else:
                 logging.error("SPI NOT CONNECTED!")
                 self.com_type = COM_TYPE.NONE
         elif self.com_type == COM_TYPE.UART:
             if self.serial and self.serial.is_open:
-                self.serial.write(write_data)
+                self.serial.write(data_buffer)
             else:
                 logging.error("UART NOT CONNECTED!")
                 self.com_type == COM_TYPE.NONE
@@ -128,23 +156,52 @@ class PinnaeController:
             logging.error("NO COM TYPE SELECTED CHOOSE UART OR SPI!")
     
     def move_to_min(self,index:np.uint8, move_cw:bool = True)->None:
-        write_data = bytearray((NUM_PINNAE_MOTORS*2) +1)
+        data_buffer = bytearray((NUM_PINNAE_MOTORS*2) +1)
         
         if move_cw:
             cw_flag = 0x20
         else:
             cw_flag = 0x00
             
-        write_data[0] = 0x40 | index | cw_flag
+        data_buffer[0] = 0x40 | index | cw_flag
+        
+         # first motor
+        data_buffer[1] = (self.current_angles[0] >> 8) & 0xff
+        data_buffer[2] =  self.current_angles[0] & 0xff
+        
+        # second motor
+        data_buffer[3] = (self.current_angles[1] >> 8) & 0xff
+        data_buffer[4] =  self.current_angles[1] & 0xff
+        
+        # third motor
+        data_buffer[5] = (self.current_angles[2] >> 8) & 0xff
+        data_buffer[6] =  self.current_angles[2] & 0xff
+        
+        # fourth motor
+        data_buffer[7] = (self.current_angles[3] >> 8) & 0xff
+        data_buffer[8] =  self.current_angles[3] & 0xff
+        
+        # fifth motor
+        data_buffer[9] = (self.current_angles[4] >> 8) & 0xff
+        data_buffer[10] = self.current_angles[4] & 0xff
+        
+        # sixth motor
+        data_buffer[11] = (self.current_angles[5] >> 8) & 0xff
+        data_buffer[12] =  self.current_angles[5] & 0xff
+        
+        # seventh motor
+        data_buffer[13] = (self.current_angles[6] >> 8) & 0xff
+        data_buffer[14] =  self.current_angles[6] & 0xff
+        
         if self.com_type == COM_TYPE.SPI:
             if self.spi:
-                self.spi.xfer2(write_data)
+                self.spi.xfer2(data_buffer)
             else:
                 logging.error("SPI NOT CONNECTED!")
                 self.com_type = COM_TYPE.NONE
         elif self.com_type == COM_TYPE.UART:
             if self.serial and self.serial.is_open:
-                self.serial.write(write_data)
+                self.serial.write(data_buffer)
             else:
                 logging.error("UART NOT CONNECTED!")
                 self.com_type == COM_TYPE.NONE
