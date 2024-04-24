@@ -1590,7 +1590,7 @@ class BBGUI(QWidget):
                 self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
             
             else:
-                if index > 3:
+                if index >= 3:
                     mult = -1
                 else:
                     mult = 1
@@ -1624,7 +1624,7 @@ class BBGUI(QWidget):
                 self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
             
             else:
-                if index > 3:
+                if index >= 3:
                     mult = -1
                 else:
                     mult = 1
