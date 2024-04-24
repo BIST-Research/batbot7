@@ -1141,9 +1141,9 @@ class BBGUI(QWidget):
         table_side_grid.addWidget(self.cycle_counter_SB,3,1)
         
         # out of phase option
-        self.ear_phase_CB = QCheckBox("PHASE EARS")
-        self.ear_phase_CB.pressed.connect(self.ear_phase_CB_cb)
-        table_side_grid.addWidget(self.ear_phase_CB,4,0)
+        # self.ear_phase_CB = QCheckBox("PHASE EARS")
+        # self.ear_phase_CB.pressed.connect(self.ear_phase_CB_cb)
+        # table_side_grid.addWidget(self.ear_phase_CB,4,0)
 
         # add context menu for instruction table
         self.instruction_TABLE.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -1531,6 +1531,7 @@ class BBGUI(QWidget):
         # adjust the slider and spinbox range
         for i in range(NUM_PINNAE):
             self.motor_max_limit_changed_CB(i)
+            self.motor_min_limit_changed_CB(i)
         
     def motor_max_PB_pressed(self,index):
         """Sets the current motor to its max value
@@ -1628,8 +1629,15 @@ class BBGUI(QWidget):
                 else:
                     mult = 1
                     
-                self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
-                self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                if index != 7 or index != 6:
+                    self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                    self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                else:
+                    if index == 6:
+                        self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                    if index == 7:    
+                        self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                    
                 # if self.ear_phase_CB.isChecked():
                 #      if index < 3:
                 #          max = self.motor_min_limit_SB[index].value()*-1
