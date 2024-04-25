@@ -923,13 +923,13 @@ class BBGUI(QWidget):
                 spec_tup1, pt_cut1, pt1 = process(L, spec_settings, time_offs=time_off)
                 spec_tup2, pt_cut2, pt2 = process(R, spec_settings, time_offs=time_off)
                 self.leftPinnaeSpec.axes.cla()  # Clear the canva
-                plot_spec(self.leftPinnaeSpec.axes, self.leftPinnaeSpec.figure, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb=not self.left_pinna_plotted)
+                plot_spec(self.leftPinnaeSpec.axes, self.leftPinnaeSpec.figure, spec_tup1, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Pinna',use_cb=not self.left_pinna_plotted)
                 self.leftPinnaeSpec.draw()
                 self.leftPinnaeSpec.axes.set_ybound(30e3,100e3)
                 self.leftPinnaeSpec.figure.tight_layout()
                 
                 self.rightPinnaeSpec.axes.cla()  # Clear the canvas.
-                plot_spec(self.rightPinnaeSpec.axes, self.rightPinnaeSpec.figure, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Left Ear',use_cb= not self.right_pinna_plotted)
+                plot_spec(self.rightPinnaeSpec.axes, self.rightPinnaeSpec.figure, spec_tup2, fbounds = f_plot_bounds, dB_range = DB_range, plot_title='Right Pinna',use_cb= not self.right_pinna_plotted)
                 self.rightPinnaeSpec.draw()
                 self.rightPinnaeSpec.figure.tight_layout()
                 
@@ -1595,18 +1595,16 @@ class BBGUI(QWidget):
                 # else:
                 #     mult = 1
                 mult = 1
-                self.left_pinna.set_motor_angle(index, self.motor_value_SB[index].value()*mult)
-                self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value()*mult)
-                # if self.ear_phase_CB.isChecked():
-                #     if index < 3:
-                #         max = self.motor_min_limit_SB[index].value()*-1
-                #         self.right_pinna.set_motor_angle(index, max + self.motor_value_SB[index].value())
-                #     else:
-                #         max = self.motor_max_limit_SB[index].value()
-                #         self.right_pinna.set_motor_angle(index, max - self.motor_value_SB[index].value())
-                # else:   
-                #     self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
-
+                    
+                if index != 6 and index != 5:
+                    self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                    self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                else:
+                    if index == 5:
+                        self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                    elif index == 6:    
+                        self.right_pinna.set_motor_angle(5, self.motor_value_SLIDER[index].value()*mult)
+    
         
         
     def motor_value_SLIDER_valueChanged(self,index):
@@ -1631,24 +1629,14 @@ class BBGUI(QWidget):
                 #     mult = 1
                 mult = 1
                     
-                if index != 7 or index != 6:
+                if index != 6 and index != 5:
                     self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
                     self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
                 else:
-                    if index == 6:
+                    if index == 5:
                         self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
-                    elif index == 7:    
-                        self.right_pinna.set_motor_angle(6, self.motor_value_SLIDER[index].value()*mult)
-                    
-                # if self.ear_phase_CB.isChecked():
-                #      if index < 3:
-                #          max = self.motor_min_limit_SB[index].value()*-1
-                #          self.right_pinna.set_motor_angle(index, max + self.motor_value_SB[index].value())
-                #      else:
-                #          max = self.motor_max_limit_SB[index].value()
-                #          self.right_pinna.set_motor_angle(index, max - self.motor_value_SB[index].value())
-                # else:   
-                #     self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
+                    elif index == 6:    
+                        self.right_pinna.set_motor_angle(5, self.motor_value_SLIDER[index].value()*mult)
     
     
     def motor_set_zero_PB_callback(self,index):
@@ -1877,9 +1865,13 @@ class RunInstructionsThread(QThread):
         
     def run(self):
         logging.debug("RunInstructionsThread starting")
+        right_data = self.data
+        if self.r_pinna is not None:
+            right_data[:,5] = self.data[:,6]
+            
         while self.runThread:
             self.l_pinna.set_motor_angles(self.data[self.curIndex])
-            self.r_pinna.set_motor_angles(self.data[self.curIndex])
+            self.r_pinna.set_motor_angles(right_data[self.curIndex])
             
             print(self.data[self.curIndex])
             self.curIndex+=1

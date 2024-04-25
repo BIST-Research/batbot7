@@ -11,7 +11,7 @@ emit_MCU:
   type: 'UART'
   port: 'tty.usbmodem14101'
   baud: 960000
-  serial_num: '4D39AB9A5351523450202020FF11334F'
+  serial_num: '639C38475351523450202020FF0E3F19'
   use: serial_num
 
 
