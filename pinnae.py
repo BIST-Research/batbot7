@@ -45,7 +45,7 @@ class PinnaeController:
         self.com_type = COM_TYPE.NONE
         
 
-
+        # communication objects
         self.spi = spiObj
         self.serial = serial_dev
     
@@ -62,11 +62,19 @@ class PinnaeController:
             self.com_type = COM_TYPE.NONE
     
     def config_uart(self,serial_obj:Serial)->None:
+        """configures the current serial object to be the one passed through. 
+        Changes the communication type to be serial.
+
+        Args:
+            serial_obj (Serial): new serial object to use, does not verify
+        """
         self.serial = serial_obj
         self.com_type = COM_TYPE.UART
         logging.debug("Using UART NOW!")
         
     def close_uart(self)->None:
+        """If there is a serial object open, this closes the port.
+        """
         if self.serial:
             if self.serial.is_open:
                 self.serial.close()
@@ -74,6 +82,12 @@ class PinnaeController:
                 self.com_type = COM_TYPE.NONE
                 
     def connection_status(self)->bool:
+        """Returns the connection status of the object, this needs to be updated
+        as it does not poll the Grandcentral for acknowledgement
+
+        Returns:
+            bool: True if the Grand Central is connected
+        """
         if self.com_type == COM_TYPE.NONE:
             return False
         
@@ -85,6 +99,8 @@ class PinnaeController:
             return self.serial.is_open
         
     def disconnect_serial(self):
+        """Disconnects the serial connection 
+        """
         try:
             self.serial.close()
         except:
@@ -104,12 +120,26 @@ class PinnaeController:
         self.spi.max_speed_hz = 10000000
         
     def get_ack(self)->bool:
+        """Polls the MCU to see if it is connected. This is not implemented 
+        yet so simply returns no each time.
+
+        Returns:
+            bool: _description_
+        """
         return False
     
-    def reset_zero_position(self,index:np.uint16)->None:
+    def reset_zero_position(self,index:np.uint8)->None:
+        """Resets the encoder zero to whatever position the motor is currently at. 
+        Ie say the motor is currently sitting at angle 34 degrees, after sending this 
+        the MCU will reset its current position to 0. 
+
+        Args:
+            index (np.uint8): motor index to reset its zero position 
+        """
         
         data_buffer = bytearray((NUM_PINNAE_MOTORS*2)+1)
         
+        # to reset zero set the MSB to 1 and lower 3 bits to the motor index
         data_buffer[0] = (0x80) | index
         
         # first motor
@@ -156,13 +186,20 @@ class PinnaeController:
             logging.error("NO COM TYPE SELECTED CHOOSE UART OR SPI!")
     
     def move_to_min(self,index:np.uint8, move_cw:bool = True)->None:
+        """Makes the MCU find its hardware min or maximum end stop - depending
+        on the move_cw bool and the orientation of the motor respective to you.
+
+        Args:
+            index (np.uint8): motor index to move
+            move_cw (bool, optional): which direction it should spin to find its end stop. Defaults to True.
+        """
         data_buffer = bytearray((NUM_PINNAE_MOTORS*2) +1)
         
         if move_cw:
             cw_flag = 0x20
         else:
             cw_flag = 0x00
-            
+        # set the 7th bit to 1 and or the index that should move
         data_buffer[0] = 0x40 | index | cw_flag
         
          # first motor
@@ -216,7 +253,7 @@ class PinnaeController:
         bytes and send them
 
         """
-        # data_buffer = np.zeros( NUM_PINNAE_MOTORS*2 +1,dtype=np.uint8)
+
         data_buffer = bytearray((NUM_PINNAE_MOTORS*2)+1)
         
         # first motor
@@ -247,8 +284,6 @@ class PinnaeController:
         data_buffer[13] = (self.current_angles[6] >> 8) & 0xff
         data_buffer[14] =  self.current_angles[6] & 0xff
         
-        # convert the data to list so we can send it
-        # write_data = data_buffer.tolist()
     
         
         if self.com_type == COM_TYPE.SPI:
@@ -268,6 +303,15 @@ class PinnaeController:
             
         
     def calibrate_and_get_motor_limits(self)->np.int16:
+        """Should command the MCU to make each motor move and find its end points
+        such that it can calibrate its zero position and know its limits and have
+        it send it back. 
+
+            NOT IMPLEMENTED
+
+        Returns:
+            np.int16: New limits returned from MCU
+        """
         pass 
 
 
@@ -373,15 +417,14 @@ class PinnaeController:
 
     # set the new angle of the motor
     def set_motor_angle(self,motor_index: np.uint8, angle: np.int16)->bool:
-        """Checks if the new motor angle requested is valid. Meaning if 
-        it falls between the current angle.
+        """Sets the angle of the motor.
 
         Args:
-            motor_index (np.uint8): _description_
-            angle (np.int16): _description_
+            motor_index (np.uint8): motor you want to move
+            angle (np.int16): new angle to move to
 
         Returns:
-            bool: _description_
+            bool: True if the new angle is within limits
         """
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} greater than NUM_PINNAE_MOTORS: {NUM_PINNAE_MOTORS}"
         if angle > self.max_angle_limits[motor_index] or angle < self.min_angle_limits[motor_index]:
@@ -394,7 +437,16 @@ class PinnaeController:
         return True
 
 
-    def set_motor_angles(self,angles:np.int16)->bool:        
+    def set_motor_angles(self,angles:np.int16)->bool:
+        """Sets the angle of the motors from the passed array.
+        Size of the angle should be equal to the number of motors
+        
+        Args: 
+            angle (np.int16): new angles for the motors
+            
+        Returns:
+            bool: True if all angles fall within each motor's limits
+        """   
         if not isinstance(angles,list) and not isinstance(angles,np.ndarray):
             return False
         
