@@ -82,6 +82,11 @@ class EchoEmitter:
         self.EMIT_TIME = 0
     
     def connect_Serial(self,serial:Serial):
+        """Connect device to serial object, checks to see if the object is good
+
+        Args:
+            serial (Serial): new serial object
+        """
         self.itsy = serial
         self.itsy.timeout = 0.5
         self.connection_status()
@@ -90,6 +95,8 @@ class EchoEmitter:
 
         
     def disconnect_serial(self):
+        """Disconnects the serial object
+        """
         try:
             self.itsy.close()
         except:
@@ -97,6 +104,15 @@ class EchoEmitter:
         
         
     def connection_status(self,print_:bool = False) ->bool:
+        """Returns if the ItsyBitsy is still connected by asking for
+        and acknowledgment. 
+
+        Args:
+            print_ (bool, optional): if it should print to console. Defaults to False.
+
+        Returns:
+            bool: _description_
+        """
         if not self.itsy.is_open:
             if print_: print(f"{t_colors.FAIL}EMIT NO SERIAL!{t_colors.ENDC}") 
             try:
@@ -128,6 +144,11 @@ class EchoEmitter:
         return False
     
     def write_cmd(self,cmd:ECHO_SERIAL_CMD):
+        """Sends command to Itsy
+
+        Args:
+            cmd (ECHO_SERIAL_CMD): command to send
+        """
         write_val = struct.pack('B',cmd.value)
         self.itsy.write(write_val)
 
@@ -179,6 +200,16 @@ class EchoEmitter:
             return False
 
     def upload_chirp(self,data:np.uint16 = None)->bool:
+        """Uploads data passed to the ItsyBitsy as long as the data is not too long.
+        Verifies the Itsy recieves the data by making it compute a CRC32 hash after
+        sending data is done.
+
+        Args:
+            data (np.uint16, optional): data to send. Defaults to None.
+
+        Returns:
+            bool: if uploaded successfully
+        """
         self.itsy.flush()
         if not self.connection_status():
             return False
@@ -267,6 +298,11 @@ class EchoEmitter:
 
  
     def get_max_chirp_uint16_length(self) -> np.uint16:
+        """Asks the MCU for the maximum data that can be sent.
+
+        Returns:
+            np.uint16: _description_
+        """
         if not self.connection_status():
             return False
         
@@ -289,6 +325,20 @@ class EchoEmitter:
     
     
     def gen_chirp(self,f_start:int,f_end:int, t_end:int,method:str ='linear',gain:float = None,offset = None)->tuple[np.uint16,np.ndarray]:
+        """Generates a chirp using scipy chirp. Returns the signal and time 
+        vector of the chirp.
+
+        Args:
+            f_start (int): starting frequency
+            f_end (int): ending frequency
+            t_end (int): duration of chirp in ms!!
+            method (str, optional): type of chirp, linear,quadratic, hyperbolic, log... Defaults to 'linear'.
+            gain (float, optional): gain to multiply signal by -  values range from 0-1 for no gain. Defaults to None.
+            offset (_type_, optional): offset amount from 0.. Defaults to None.
+
+        Returns:
+            tuple[np.uint16,np.ndarray]: signal, time_vector 
+        """
         Fs = 1e6
         Ts = 1/Fs
         t = np.arange(0,t_end*1e-3 - Ts/2,Ts)
@@ -304,6 +354,17 @@ class EchoEmitter:
         return [chirp,t]
     
     def gen_sine(self,time_ms:np.uint16, freq:np.uint16,gain:float = None,offset = None)->tuple[np.uint16,np.ndarray]:
+        """Generates a constant frequency sine wave
+
+        Args:
+            time_ms (np.uint16): length in ms to generate
+            freq (np.uint16): frequency to generate
+            gain (float, optional): gain to multiply 0-1 range. Defaults to None.
+            offset (_type_, optional): offset of signal from 0. Defaults to None.
+
+        Returns:
+            tuple[np.uint16,np.ndarray]: _description_
+        """
         DATA_LEN = int(time_ms*1e3)
         duration = DATA_LEN / 1e6  # Duration of the sine wave (in seconds)
         
@@ -321,6 +382,17 @@ class EchoEmitter:
         return [sin_wave,t]
     
     def convert_and_range_data(self,data:np.ndarray,gain:float = None,offset:float =None)->np.uint16:
+        """Pass any type of data array and function will automatically range values 0-1*gain+offset and
+        returns the data as uint16 data type.
+
+        Args:
+            data (np.ndarray): float,int,double any type of data
+            gain (float, optional): gain on 0-1 signal. Defaults to None.
+            offset (float, optional): offset of signal. Defaults to None.
+
+        Returns:
+            np.uint16: ranged data ready for upload
+        """
         data = data - np.min(data)
         data = data/np.max(data)
         
@@ -338,6 +410,17 @@ class EchoEmitter:
         return data.astype(np.uint16)
     
     def get_and_convert_numpy(self,file_name:str,gain:float = None,offset = None)->np.uint16:
+        """Given a file name, takes the file and converts it to a numpy array that is suitable 
+        for the emitter.
+
+        Args:
+            file_name (str): name of the chirp data
+            gain (float, optional): gain for 0-1*gain signal. Defaults to None.
+            offset (float, optional): amount to offset signal from 0. Defaults to None.
+
+        Returns:
+            np.uint16: ranged data ready for upload
+        """
         if not os.path.exists(file_name):
             print(f"File does not exist!")
             return None
