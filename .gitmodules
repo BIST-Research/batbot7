@@ -1,0 +1,3 @@
+[submodule "src/SPI Tendon Controller"]
+	path = src/SPI Tendon Controller
+	url = https://github.com/Masonl23/SPI-Tendon-Controller
