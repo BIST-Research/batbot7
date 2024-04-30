@@ -1590,20 +1590,15 @@ class BBGUI(QWidget):
                 self.right_pinna.set_motor_angle(index, self.motor_value_SB[index].value())
             
             else:
-                # if index >= 3:
-                #     mult = -1
-                # else:
-                #     mult = 1
-                mult = 1
                     
                 if index != 6 and index != 5:
-                    self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
-                    self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                    self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                    self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
                 else:
                     if index == 5:
-                        self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                        self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
                     elif index == 6:    
-                        self.right_pinna.set_motor_angle(5, self.motor_value_SLIDER[index].value()*mult)
+                        self.right_pinna.set_motor_angle(5, self.motor_value_SLIDER[index].value())
     
         
         
@@ -1623,20 +1618,15 @@ class BBGUI(QWidget):
                 self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
             
             else:
-                # if index >= 3:
-                #     mult = -1
-                # else:
-                #     mult = 1
-                mult = 1
                     
                 if index != 6 and index != 5:
-                    self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
-                    self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                    self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                    self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
                 else:
                     if index == 5:
-                        self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value()*mult)
+                        self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
                     elif index == 6:    
-                        self.right_pinna.set_motor_angle(5, self.motor_value_SLIDER[index].value()*mult)
+                        self.right_pinna.set_motor_angle(5, self.motor_value_SLIDER[index].value())
     
     
     def motor_set_zero_PB_callback(self,index):

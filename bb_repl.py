@@ -287,6 +287,11 @@ class bb_repl(Cmd):
 
     
     pinna_parser = Cmd2ArgumentParser()
+    pinna_parser.add_argument('-i','--index',type=int,help="index of motor 1-7",default=-1)
+    pinna_parser.add_argument('-a','--angle',type=int,help="new angle for motor",default=-1)
+    pinna_parser.add_argument('-max','--max',type=int,help="new angle max for motor",default=-500)
+    pinna_parser.add_argument('-min','--min',type=int,help="new angle min for motor",default=-500)
+    pinna_parser.add_argument('-l','--limits',action='store_true',help='show limits of motors')
     pinna_parser.add_argument('-g','--gui',action='store_true')
     pinna_parser.add_argument('-cal','--calibrate',action='store_true')
     @with_argparser(pinna_parser)
@@ -312,6 +317,38 @@ class bb_repl(Cmd):
         if args.calibrate:
             l_lims = self.L_pinna_MCU.calibrate_and_get_motor_limits()
             r_lims = self.R_pinna_MCU.calibrate_and_get_motor_limits()
+
+        if args.limits:
+            max = self.L_pinna_MCU.max_angle_limits
+            mins = self.L_pinna_MCU.min_angle_limits
+            self.poutput(f"Maxs: {max}")
+            self.poutput(f"Mins: {mins}")
+        if args.index != -1:
+        
+            if args.index > pinnae.NUM_PINNAE_MOTORS or args.index < 1:
+                self.perror("index must be 1-7")
+                return
+
+            if args.angle != -1:
+                tookAngle = self.L_pinna_MCU.set_motor_angle(args.index+1,args.angle)
+                tookAngle &= self.R_pinna_MCU.set_motor_angle(args.index+1,args.angle)
+                if not tookAngle:
+                    self.perror("Angle out of range!")
+                    return
+            if args.max != -500:
+                tookMax = self.L_pinna_MCU.set_motor_max_limit(args.index+1,args.max)
+                tookMax &= self.R_pinna_MCU.set_motor_max_limit(args.index+1,args.max)
+                if not tookMax:
+                    self.perror("Max not accepted!")
+                    return
+            if args.min != -500:
+                tookMin = self.L_pinna_MCU.set_motor_min_limit(args.index+1,args.min)
+                tookMin &= self.R_pinna_MCU.set_motor_min_limit(args.index+1,args.min)
+                if not tookMin:
+                    self.perror("Min not accepted!")
+                    return
+                
+
             
             
         
