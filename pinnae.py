@@ -8,6 +8,7 @@ import argparse
 from serial import Serial
 from enum import Enum
 
+
 # for developing on not the PI we create fake library
 # that mimics spidev
 try:
@@ -594,31 +595,50 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QSpinBox,
     QGridLayout,
+    QTableWidgetItem,
     QErrorMessage,
     QMenu,
     QTableWidget,
-    QFileDialog
+    QFileDialog,
+    
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt,QThread,pyqtSignal
 from PyQt6.QtGui import QIcon
 import sys
 import qdarkstyle
-
+import time
+import yaml
 
 class PinnaWidget(QWidget):
     main_v_layout = QVBoxLayout()
 
+    instructionThread = None
+    instructionThreadRunning = None
+
     def __init__(self,l_pinna:PinnaeController, r_pinna:PinnaeController):
         QWidget.__init__(self)
         
-        self.pinnae = l_pinna
-        
+        self.left_pinna = l_pinna
+        self.right_pinna = r_pinna
+
         self.setWindowTitle("Tendon Controller")
         self.setWindowIcon(QIcon('HBAT.jpg'))
-        self.add_settings_box()
+        # self.add_settings_box()
         self.add_motor_controls()
         self.add_table()
         self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
+
+        for i in range(NUM_PINNAE_MOTORS):
+            if i < 3:
+                self.motor_min_limit_SB[i].setValue(0)
+                self.motor_max_limit_SB[i].setValue(170)
+            else:
+                self.motor_min_limit_SB[i].setValue(-170)
+                self.motor_max_limit_SB[i].setValue(0)
+
+                
+            self.motor_min_limit_changed_CB(i)
+            self.motor_max_limit_changed_CB(i)
         
         self.setLayout(self.main_v_layout)
 
@@ -633,15 +653,13 @@ class PinnaWidget(QWidget):
 
         self.load_file = QPushButton("Load File")
         self.load_file.clicked.connect(self.load_file_CB)
-        grid_lay.addWidget(self.load_file,0,1)
+        grid_lay.addWidget(self.load_file,0,0)
 
-        self.create_file = QPushButton("Create File")
+        self.create_file = QPushButton("Save File")
         self.create_file.clicked.connect(self.create_file_CB)
-        grid_lay.addWidget(self.create_file,1,1)
+        grid_lay.addWidget(self.create_file,0,1)
 
-        # grid_lay.addWidget(QLabel("Motion File:"),0,2)
-        # self.file_name = QLineEdit()
-        # grid_lay.addWidget(self.file_name,0,3)
+
 
 
         self.main_v_layout.addLayout(grid_lay)
@@ -792,37 +810,47 @@ class PinnaWidget(QWidget):
             control_h_lay.addWidget(self.motor_GB[index])
         
         self.main_v_layout.addLayout(control_h_lay)
+
+        
         
         # attach callbacks for controller tendon api
         self.add_motor_control_CB()
 
     def add_table(self):
         hlay = QHBoxLayout()
-        self.instruction_T = QTableWidget(1,NUM_PINNAE_MOTORS+1)
-        hlay.addWidget(self.instruction_T)
-        self.instruction_T.setHorizontalHeaderLabels(["M1","M2","M3","M4","M5","M6","M7","Time"])
+        self.instruction_TABLE = QTableWidget(1,NUM_PINNAE_MOTORS)
+        hlay.addWidget(self.instruction_TABLE)
+        self.instruction_TABLE.setHorizontalHeaderLabels(["M1","M2","M3","M4","M5","M6","M7"])
+
+        # set default values in table
+        for i in range(NUM_PINNAE_MOTORS):
+            intNum = QTableWidgetItem()
+            intNum.setData(0,0)
+            self.instruction_TABLE.setItem(0,i,intNum)
         
         #-------------------------------------------------
         buttonGB = QGroupBox("Settings")
         vlay = QVBoxLayout()
 
         self.run_angles_PB = QPushButton("Run")
+        self.run_angles_PB.pressed.connect(self.start_stop_instruction_PB_pressed_CB)
         vlay.addWidget(self.run_angles_PB)
 
-        self.step_back_PB = QPushButton("Step Backward")
-        vlay.addWidget(self.step_back_PB)
+        self.load_file_PB = QPushButton("Load")
+        self.load_file_PB.pressed.connect(self.load_movements_PB_cb)
+        vlay.addWidget(self.load_file_PB)
+        
+        self.save_file_PB = QPushButton("Save")
+        self.save_file_PB.pressed.connect(self.save_movements_PB_cb)
+        vlay.addWidget(self.save_file_PB)
 
-        self.step_forward_PB = QPushButton("Step Forward")
-        vlay.addWidget(self.step_forward_PB)
+        self.speed_SB = QSpinBox()
+        self.speed_SB.setSuffix(' Hz')
+        self.speed_SB.setRange(1,100)
+        vlay.addWidget(self.speed_SB)
 
-        self.new_row_PB = QPushButton("+ Row")
-        vlay.addWidget(self.new_row_PB)
-
-        self.delete_row_PB = QPushButton("- Row")
-        vlay.addWidget(self.delete_row_PB)
-
-        self.paste_angles_PB = QPushButton("Paste Current Angles")
-        vlay.addWidget(self.paste_angles_PB)
+        self.instruction_TABLE.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.instruction_TABLE.customContextMenuRequested.connect(self.instruction_T_contextMenu)
 
 
         buttonGB.setLayout(vlay)
@@ -830,7 +858,215 @@ class PinnaWidget(QWidget):
         hlay.addWidget(buttonGB)
 
         self.main_v_layout.addLayout(hlay)
+
+    def start_stop_instruction_PB_pressed_CB(self):
+        if not self.instructionThreadRunning:
+            rows = self.instruction_TABLE.rowCount()
+            dataArray = np.zeros((rows,NUM_PINNAE_MOTORS),np.int16)
+             
+            for row in range(self.instruction_TABLE.rowCount()):
+                dataArray[row][0] = int(self.instruction_TABLE.item(row,0).text())
+                dataArray[row][1] = int(self.instruction_TABLE.item(row,1).text())
+                dataArray[row][2] = int(self.instruction_TABLE.item(row,2).text())
+                dataArray[row][3] = int(self.instruction_TABLE.item(row,3).text())
+                dataArray[row][4] = int(self.instruction_TABLE.item(row,4).text())
+                dataArray[row][5] = int(self.instruction_TABLE.item(row,5).text())
+                dataArray[row][6] = int(self.instruction_TABLE.item(row,6).text())
+                 
+            print(dataArray)
+
+            self.instructionThread = RunInstructionsThread(dataArray,self.speed_SB.value(),self.left_pinna,self.right_pinna)
+                
+            self.instructionThread.start()
+            self.instructionThread.end_motor_angles.connect(self.end_motor_values_emit_callback)
+            self.instructionThreadRunning = True
+            self.run_angles_PB.setText("Stop")
+            # self.set_motor_GB_enabled(False)
+        else:
+            # see end_motor_values_emit_callback for enabling - we want to update values first before enabling
+            #  self.set_motor_GB_enabled(True)
+             self.instructionThreadRunning = False
+             self.run_angles_PB.setText("Run")
+             if self.instructionThread is not None and self.instructionThread.isRunning():
+                 self.instructionThread.stop()
+    
+    def end_motor_values_emit_callback(self,dataIn):
+        for i in range(NUM_PINNAE_MOTORS):
+            self.motor_value_SB[i].blockSignals(True)
+            self.motor_value_SLIDER[i].blockSignals(True)
+            
+            self.motor_value_SB[i].setValue(dataIn[i])
+            self.motor_value_SLIDER[i].setValue(dataIn[i])
+            
+            self.motor_value_SB[i].blockSignals(False)
+            self.motor_value_SLIDER[i].blockSignals(False)
+        # self.set_motor_GB_enabled(True)
+
+    def instruction_T_contextMenu(self,position):
+        context_menu = QMenu()
+
+        add_row_action = context_menu.addAction("Add Row")
+        delete_row_action = context_menu.addAction("Delete Row")
+        duplicate_row_action = context_menu.addAction("Duplicate Row")
+        paste_max_action = context_menu.addAction("Paste Max's")
+        paste_min_action = context_menu.addAction("Paste Min's")
+        paste_current_angles_action = context_menu.addAction("Paste Current Angles")
+        action = context_menu.exec(self.instruction_TABLE.viewport().mapToGlobal(position))
         
+        if action == add_row_action:
+            self.instruction_TABLE_contextMenu_add_row()
+        elif action == delete_row_action:
+            self.instruction_TABLE_contextMenu_delete_row()
+        elif action == duplicate_row_action:
+            self.instruction_TABLE_contextMenu_duplicate_row()
+        elif action == paste_max_action:
+            self.instruction_TABLE_contextMenu_paste_maxs()
+        elif action == paste_min_action:
+            self.instruction_TABLE_contextMenu_paste_mins()
+        elif action == paste_current_angles_action:
+            self.instruction_TABLE_contextMenu_paste_current()
+
+    def instruction_TABLE_contextMenu_add_row(self):
+        rows = self.instruction_TABLE.rowCount() +1
+        self.instruction_TABLE.setRowCount(rows)
+        self.instruction_TABLE.update()
+
+        for i in range(NUM_PINNAE_MOTORS):
+            intNum = QTableWidgetItem()
+
+            min = int(self.left_pinna.get_motor_min_limit(i))
+            intNum.setData(0,min)
+            self.instruction_TABLE.setItem(rows-1,i,intNum)
+
+
+    def instruction_TABLE_contextMenu_delete_row(self):
+        if self.instruction_TABLE.currentRow() >= 0:
+            self.instruction_TABLE.removeRow(self.instruction_TABLE.currentRow())
+            logging.debug("deleted row")
+
+        if self.instruction_TABLE.rowCount() == 0:
+            self.instruction_TABLE_contextMenu_add_row()
+
+    def instruction_TABLE_contextMenu_duplicate_row(self):
+        selected_row = self.instruction_TABLE.currentRow()
+        num_rows = self.instruction_TABLE.rowCount()
+
+        if selected_row >=0:
+            row_items = [self.instruction_TABLE.item(selected_row,col).text() for col in range(NUM_PINNAE_MOTORS)]
+            self.instruction_TABLE.setRowCount(num_rows+1)
+
+            for col,text in enumerate(row_items):
+                newItem = QTableWidgetItem()
+                newItem.setData(0,int(text))
+                self.instruction_TABLE.setItem(num_rows,col,newItem)
+
+    def instruction_TABLE_contextMenu_paste_maxs(self):
+        selected_row = self.instruction_TABLE.currentRow()
+
+        if selected_row >=0:
+            for col, max_val in enumerate(self.motor_max_limit_SB):
+                newItem = QTableWidgetItem()
+                newItem.setData(0,int(max_val.value()))
+                self.instruction_TABLE.setItem(selected_row,col,newItem)
+
+    def instruction_TABLE_contextMenu_paste_mins(self):
+        selected_row = self.instruction_TABLE.currentRow()
+
+        if selected_row >=0:
+            for col, min_val in enumerate(self.motor_min_limit_SB):
+                newItem = QTableWidgetItem()
+                newItem.setData(0,int(min_val.value()))
+                self.instruction_TABLE.setItem(selected_row,col,newItem)
+
+    def instruction_TABLE_contextMenu_paste_current(self):
+        selected_row = self.instruction_TABLE.currentRow()
+
+        if selected_row >=0:
+            for col, motor_val in enumerate(self.motor_value_SB):
+                newItem = QTableWidgetItem()
+                newItem.setData(0,int(motor_val.value()))
+                self.instruction_TABLE.setItem(selected_row,col,newItem)
+        
+    
+    def save_movements_PB_cb(self):
+        fd = QFileDialog(self)
+
+        file_path,_ = fd.getSaveFileName(None, "Save movements","","YAML Files (*.yaml)")
+        
+        if file_path:
+            num_rows = self.instruction_TABLE.rowCount()
+            
+            array_2d = [[0] * NUM_PINNAE_MOTORS for _ in range(num_rows)]
+            
+            for row in range(num_rows):
+                for col in range(NUM_PINNAE_MOTORS):
+                    data = self.instruction_TABLE.item(row,col)
+                    array_2d[row][col] = int(data.text())
+                    
+            data = {
+                'pinna_movements': {
+                    'speed': self.speed_SB.value(),
+                    'angles': 
+                        array_2d
+                }
+            }
+            
+                
+            splitted = file_path.split(".")
+            file_path = splitted[0]+"_PM.yaml" 
+            print(f" save path {file_path}")
+        
+                
+            with open(file_path,'w') as f:
+                yaml.dump(data,f)
+        else:
+            print("no save")    
+    
+    
+    def load_movements_PB_cb(self):
+        fd = QFileDialog(self)
+        fd.setWindowTitle("Open File")
+        fd.setNameFilter('YAML files (*.yaml)')
+        fd.setFileMode(QFileDialog.FileMode.ExistingFiles)
+        
+        if fd.exec():
+            
+            selected_files = fd.selectedFiles()
+            if selected_files:
+                file_path = selected_files[0]
+                print("Selected file:", file_path)
+                with open(file_path,'r') as f:
+                    yam_file = yaml.safe_load(f)
+                    
+                if not 'pinna_movements' in yam_file:
+                    win = QErrorMessage(self)
+                    win.showMessage("Did not find valid 'pinna_movements' in file!")
+                    return
+                
+                angles = yam_file["pinna_movements"]["angles"]
+                print("Angles:")
+                
+                num_rows = len(angles)
+
+                self.instruction_TABLE.clear()
+                self.instruction_TABLE.setRowCount(num_rows)
+
+                for row, angle_row in enumerate(angles):
+                    for col,angle in enumerate(angle_row):
+                        newItem = QTableWidgetItem()
+                        newItem.setData(0,int( angle ))
+                        self.instruction_TABLE.setItem(row,col,newItem)    
+                
+                self.speed_SB.setValue(int(yam_file["pinna_movements"]["speed"]))
+                        
+                    
+                    
+            else:
+                return
+        else:
+            return
+
+
     def add_motor_control_CB(self):
         """Connects the motor tendons sliders to the api"""
         
@@ -864,9 +1100,7 @@ class PinnaWidget(QWidget):
         for i in range(NUM_PINNAE_MOTORS):
             self.motor_value_SB[i].editingFinished.connect(lambda index=i: self.motor_value_SB_valueChanged(index))
             
-        # adjust the slider and spinbox range
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_max_limit_changed_CB(i)
+
 
 
     def motor_GB_contextMenu(self,position,index) -> None:
@@ -903,7 +1137,8 @@ class PinnaWidget(QWidget):
         Args:
             index (_type_): index of motor 
         """
-        self.pinnae.set_motor_to_max(index)
+        self.left_pinna.set_motor_to_max(index)
+        self.right_pinna.set_motor_to_max(index)
         self.motor_value_SB[index].setValue(self.motor_max_limit_SB[index].value())
         self.motor_value_SLIDER[index].setValue(self.motor_max_limit_SB[index].value())
         
@@ -914,7 +1149,8 @@ class PinnaWidget(QWidget):
         Args:
             index (_type_): index of motor
         """
-        self.pinnae.set_motor_to_min(index)
+        self.left_pinna.set_motor_to_min(index)
+        self.right_pinna.set_motor_to_min(index)
         self.motor_value_SB[index].setValue(self.motor_min_limit_SB[index].value())
         self.motor_value_SLIDER[index].setValue(self.motor_min_limit_SB[index].value())
         
@@ -927,7 +1163,14 @@ class PinnaWidget(QWidget):
         """
         if self.motor_value_SB[index].value() != self.motor_value_SLIDER[index].value():
             self.motor_value_SLIDER[index].setValue(self.motor_value_SB[index].value())
-            self.pinnae.set_motor_angle(index, self.motor_value_SB[index].value())
+            if index != 6 and index != 5:
+                self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+            else:
+                if index == 5:
+                    self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                elif index == 6:    
+                    self.right_pinna.set_motor_angle(5, self.motor_value_SLIDER[index].value())
         
         
     def motor_value_SLIDER_valueChanged(self,index):
@@ -938,7 +1181,14 @@ class PinnaWidget(QWidget):
         """
         if self.motor_value_SLIDER[index].value() != self.motor_value_SB[index].value():
             self.motor_value_SB[index].setValue(self.motor_value_SLIDER[index].value())
-            self.pinnae.set_motor_angle(index,self.motor_value_SLIDER[index].value())
+            if index != 6 and index != 5:
+                self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                self.right_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+            else:
+                if index == 5:
+                    self.left_pinna.set_motor_angle(index, self.motor_value_SLIDER[index].value())
+                elif index == 6:    
+                    self.right_pinna.set_motor_angle(5, self.motor_value_SLIDER[index].value())
     
     
     def motor_set_zero_PB_callback(self,index):
@@ -947,8 +1197,9 @@ class PinnaWidget(QWidget):
         Args:
             index (_type_): changing motor new zero position
         """
-        self.pinnae.set_new_zero_position(index)
-        [min,max] = self.pinnae.get_motor_limit(index)
+        self.left_pinna.set_new_zero_position(index)
+        self.right_pinna.set_new_zero_position(index)
+        [min,max] = self.left_pinna.get_motor_limit(index)
         
         # adjust the new limits of spinbox
         self.motor_max_limit_SB[index].setValue(max)
@@ -968,15 +1219,17 @@ class PinnaWidget(QWidget):
         
         new_value = self.motor_max_limit_SB[index].value()
         
-        if  self.pinnae.set_motor_max_limit(index,new_value):
-            [min,max] = self.pinnae.get_motor_limit(index)
+        if  self.left_pinna.set_motor_max_limit(index,new_value) and self.right_pinna.set_motor_max_limit(index,new_value):
+            [min,max] = self.left_pinna.get_motor_limit(index)
             self.motor_value_SLIDER[index].setRange(min,max)
             self.motor_value_SB[index].setRange(min,max)
-            
+            num_rows = self.instruction_TABLE.rowCount()
+            for i in range(num_rows):
+                self.instruction_TABLE_cellChanged_callback(i,index)
 
 
         else:
-            self.motor_max_limit_SB[index].setValue(self.pinnae.get_motor_max_limit(index))
+            self.motor_max_limit_SB[index].setValue(self.left_pinna.get_motor_max_limit(index))
             error_msg = QErrorMessage(self)
             error_msg.showMessage("New max is greater than current angle!")
 
@@ -989,19 +1242,88 @@ class PinnaWidget(QWidget):
         
         new_value = self.motor_min_limit_SB[index].value()
         
-        if self.pinnae.set_motor_min_limit(index,new_value):
-            [min,max] = self.pinnae.get_motor_limit(index)
+        if self.left_pinna.set_motor_min_limit(index,new_value) and self.right_pinna.set_motor_min_limit(index,new_value):
+            [min,max] = self.left_pinna.get_motor_limit(index)
             self.motor_value_SLIDER[index].setRange(min,max)
             self.motor_value_SB[index].setRange(min,max)
+            num_rows = self.instruction_TABLE.rowCount()
+            for i in range(num_rows):
+                self.instruction_TABLE_cellChanged_callback(i,index)
 
         else:
-            self.motor_min_limit_SB[index].setValue(self.pinnae.get_motor_min_limit(index))
+            self.motor_min_limit_SB[index].setValue(self.left_pinna.get_motor_min_limit(index))
             error_msg = QErrorMessage(self)
             error_msg.showMessage("New min is less than current angle!")
-    
+
+    def instruction_TABLE_cellChanged_callback(self,row,column):
+        """called when table cell values are changed
+
+        Args:
+            row (int): row index
+            column (int): col index
+        """
+        logging.debug("instruction_TABLE_cellChanged")
+
+        new_value = float(self.instruction_TABLE.item(row,column).text())
+        # clamp against max value
+        if new_value > self.left_pinna.get_motor_max_limit(column):
+            # clamp the value
+            newItem = QTableWidgetItem()
+            newItem.setData(0,int(self.left_pinna.get_motor_max_limit(column)))
+            print(self.left_pinna.get_motor_max_limit(column))
+            self.instruction_TABLE.setItem(row,column,newItem)
+            logging.debug("Clamped value max")
+
+        # clamp against min value
+        if new_value < self.left_pinna.get_motor_min_limit(column):
+            # clamp
+            newItem = QTableWidgetItem()
+            newItem.setData(0,int(self.left_pinna.get_motor_min_limit(column)))
+            self.instruction_TABLE.setItem(row,column,newItem)
+            logging.debug("Clamped value min")
+class RunInstructionsThread(QThread):
+   cycle_complete = pyqtSignal(int)
+   end_motor_angles = pyqtSignal(list)
+
+   def __init__(self,dataArray,freq,l_pinna: PinnaeController, r_pinna: PinnaeController = None):
+       QThread.__init__(self)
+       self.data = dataArray
+       self.timeBetween = 1/freq
+       self.runThread = True
+       self.curIndex = 0
+       self.maxIndex = len(dataArray)
+       self.l_pinna = l_pinna
+       self.r_pinna = r_pinna
+       self.cycle_count = 0
+       
+   def run(self):
+       logging.debug("RunInstructionsThread starting")
+       right_data = self.data.copy()
+       if self.r_pinna is not None:
+           right_data[:,5] = self.data[:,6]
+
+           
+       while self.runThread:
+           self.l_pinna.set_motor_angles(self.data[self.curIndex])
+           self.r_pinna.set_motor_angles(right_data[self.curIndex])
+           
+        #    print(self.data[self.curIndex])
+           self.curIndex+=1
+           if self.curIndex >= self.maxIndex:
+               self.curIndex = 0
+               self.cycle_count += 1
+               self.cycle_complete.emit(self.cycle_count)
+           
+           time.sleep(self.timeBetween)
+       
+       self.end_motor_angles.emit(self.l_pinna.current_angles)
+       logging.debug("RunInstructionsThread exiting")
+       
+   def stop(self):
+       self.runThread = False
 
 if __name__ == "__main__":
     app = QApplication([])
-    widget = PinnaWidget(PinnaeController(SpiDev(0,0)),PinnaeController(SpiDev(0,0)))
+    widget = PinnaWidget(PinnaeController(SpiDev(0,0)),PinnaeController(SpiDev(0,1)))
     widget.show()
     sys.exit(app.exec())

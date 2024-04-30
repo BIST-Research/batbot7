@@ -1865,7 +1865,7 @@ class RunInstructionsThread(QThread):
         
     def run(self):
         logging.debug("RunInstructionsThread starting")
-        right_data = self.data
+        right_data = self.data.copy()
         if self.r_pinna is not None:
             right_data[:,5] = self.data[:,6]
             

@@ -260,10 +260,23 @@ class bb_repl(Cmd):
         
         self.do_status(None)
 
+        for i in range(pinnae.NUM_PINNAE_MOTORS):
+            if i <= 2:
+                self.L_pinna_MCU.set_motor_limit(i,0,170)
+                self.R_pinna_MCU.set_motor_limit(i,0,170)
+            else:
+                self.L_pinna_MCU.set_motor_limit(i,-170,0)
+                self.R_pinna_MCU.set_motor_limit(i,-170,0)
+                
     
 
 
     def do_gui(self,args):
+        """Runs the GUI
+
+        Args:
+            args (_type_): none
+        """
         self.app = QApplication.instance()
         if self.app is None:
             self.app = QApplication([])
@@ -278,6 +291,13 @@ class bb_repl(Cmd):
     pinna_parser.add_argument('-cal','--calibrate',action='store_true')
     @with_argparser(pinna_parser)
     def do_pinna(self,args):
+        """control the pinna's 
+        
+
+        Args:
+            -g : open up the pinna gui to control
+            -cal : calibrate the motors end positions
+        """
         if args.gui:
             self.app = QApplication.instance()
             if self.app is None:
@@ -293,7 +313,6 @@ class bb_repl(Cmd):
             l_lims = self.L_pinna_MCU.calibrate_and_get_motor_limits()
             r_lims = self.R_pinna_MCU.calibrate_and_get_motor_limits()
             
-        self.poutput(f"{args}")
             
         
             
@@ -625,6 +644,16 @@ class bb_repl(Cmd):
     upload_sine_parser.add_argument('-g','--gain',help='typical gain',type=int,default=512)
     @with_argparser(upload_sine_parser)
     def do_upload_sine(self,args):
+        """Uploads a constant frequency sine wave.
+
+        Args:
+            -f : frequency of the sine wave
+            -t : duration of the sine wave in ms
+            -p : plots the time view of the plot
+            -fft : plots the FFT of the sine wave
+            -spec : plots spectrogram of sine wave
+            -gain: of sine wave
+        """
         freq = convert_khz(args.freq)
         
 
@@ -696,6 +725,19 @@ class bb_repl(Cmd):
     upload_chirp_parser.add_argument('-cf','--file',help='file to use')
     @with_argparser(upload_chirp_parser)
     def do_upload_chirp(self,args):
+        """uploads a frequency sweep chirp
+
+        Args:
+            -f0: start frequency
+            -f1: end frequency
+            -t: length of chirp in ms
+            -m: type of chirp
+            -p: plot the time vs data
+            -fft: plot FFT of data
+            -spec: plot spectrogram of data (preview)
+            -cf: file containing chirp to upload
+            -g: gain of the chirp
+        """
         
         if not args.file:
             freq0 = convert_khz(args.freq0)
@@ -770,6 +812,14 @@ class bb_repl(Cmd):
     upload_parser.add_argument('-spec','--spec',action='store_true')
     @with_argparser(upload_parser)
     def do_upload(self,args):
+        """upload a chirp file. converts and ranges the data automatically
+
+        Args:
+            file: name/path to file
+            -fft: preview FFT of data
+            -p: time plot of data
+            -spec: spectrogram plot of data
+        """
         if not args.file:
             self.perror(f"Expected file_name")
         s = self.emit_MCU.get_and_convert_numpy(args.file)
@@ -827,6 +877,11 @@ class bb_repl(Cmd):
         self.emit_MCU.upload_chirp(data=s)
 
     def do_chirp(self,args):
+        """"Tell the emitter object to chirp"
+
+        Args:
+            args (_type_): none
+        """
         # self.emit_MCU.chirp()
         self.emit_MCU.write_cmd(bb_emitter.ECHO_SERIAL_CMD.EMIT_CHIRP)
         
