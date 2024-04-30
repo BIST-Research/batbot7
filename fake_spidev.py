@@ -21,7 +21,7 @@ class fake_SpiDev():
         logging.debug("fake open")
         
     def xfer2(de,data:list):
-        logging.debug("fake xfer2")
+        # logging.debug("fake xfer2")
         chunked_data = np.zeros(8, dtype=np.int16)
         index = 1
         chunked_data[0]= data[0]
@@ -38,4 +38,4 @@ class fake_SpiDev():
                     index +=1
                 else:
                     chunked_data[index] = (item << 8)
-        print(chunked_data)
+        # print(chunked_data)

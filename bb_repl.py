@@ -207,6 +207,11 @@ class bb_repl(Cmd):
     """
     
     dir_path = os.path.dirname(os.path.realpath(__file__))
+
+    pinna_movements = None
+    movement_thread = threading.Thread()
+    movement_thread_event = threading.Event()
+
     
     def __init__(self,yaml_cfg_file:str = 'bb_conf.yaml'):
         
@@ -291,7 +296,8 @@ class bb_repl(Cmd):
     pinna_parser.add_argument('-a','--angle',type=int,help="new angle for motor",default=-1)
     pinna_parser.add_argument('-max','--max',type=int,help="new angle max for motor",default=-500)
     pinna_parser.add_argument('-min','--min',type=int,help="new angle min for motor",default=-500)
-    pinna_parser.add_argument('-l','--limits',action='store_true',help='show limits of motors')
+    pinna_parser.add_argument('-lims','--limits',action='store_true',help='show limits of motors')
+    pinna_parser.add_argument('-cur','--cur_angles',action='store_true',help='show current motor angles')
     pinna_parser.add_argument('-g','--gui',action='store_true')
     pinna_parser.add_argument('-cal','--calibrate',action='store_true')
     @with_argparser(pinna_parser)
@@ -323,6 +329,11 @@ class bb_repl(Cmd):
             mins = self.L_pinna_MCU.min_angle_limits
             self.poutput(f"Maxs: {max}")
             self.poutput(f"Mins: {mins}")
+
+        if args.cur_angles:
+            self.poutput(f"Left:  {self.L_pinna_MCU.current_angles}")
+            self.poutput(f"Right: {self.R_pinna_MCU.current_angles}")
+
         if args.index != -1:
         
             if args.index > pinnae.NUM_PINNAE_MOTORS or args.index < 1:
@@ -330,28 +341,76 @@ class bb_repl(Cmd):
                 return
 
             if args.angle != -1:
-                tookAngle = self.L_pinna_MCU.set_motor_angle(args.index+1,args.angle)
-                tookAngle &= self.R_pinna_MCU.set_motor_angle(args.index+1,args.angle)
+                tookAngle = self.L_pinna_MCU.set_motor_angle(args.index-1,args.angle)
+                tookAngle &= self.R_pinna_MCU.set_motor_angle(args.index-1,args.angle)
                 if not tookAngle:
                     self.perror("Angle out of range!")
                     return
             if args.max != -500:
-                tookMax = self.L_pinna_MCU.set_motor_max_limit(args.index+1,args.max)
-                tookMax &= self.R_pinna_MCU.set_motor_max_limit(args.index+1,args.max)
+                tookMax = self.L_pinna_MCU.set_motor_max_limit(args.index-1,args.max)
+                tookMax &= self.R_pinna_MCU.set_motor_max_limit(args.index-1,args.max)
                 if not tookMax:
                     self.perror("Max not accepted!")
                     return
             if args.min != -500:
-                tookMin = self.L_pinna_MCU.set_motor_min_limit(args.index+1,args.min)
-                tookMin &= self.R_pinna_MCU.set_motor_min_limit(args.index+1,args.min)
+                tookMin = self.L_pinna_MCU.set_motor_min_limit(args.index-1,args.min)
+                tookMin &= self.R_pinna_MCU.set_motor_min_limit(args.index-1,args.min)
                 if not tookMin:
                     self.perror("Min not accepted!")
                     return
                 
+    run_pinna_parser = Cmd2ArgumentParser()
+    run_pinna_parser.add_argument('-pmf','--file',help='pinna movement file')
+    run_pinna_parser.add_argument('-f','--freq',default=10,type=int)
+    @with_argparser(run_pinna_parser)
+    def do_run_pinna(self,args):
 
+
+        if args.file:
+            file = str(args.file)
+            if not file.endswith('.yaml'):
+                file += ".yaml"
+            with open(file,'r') as f:
+                yam_file = yaml.safe_load(f)
             
+            if not 'pinna_movements' in yam_file:
+                self.perror("Did not find 'pinna_movements' in file!")
+                return
             
+            angles = yam_file["pinna_movements"]["angles"]
+            print(angles)
+
+            self.pinna_movements = np.array(angles,dtype=np.int16)
+
+            self.movement_thread_event.set()
+            while self.movement_thread.is_alive():
+                self.movement_thread.join()
+
+            self.movement_thread = threading.Thread(target=run_pinna_instructions,
+                                                    args=(self.movement_thread_event,self.pinna_movements,args.freq,self.L_pinna_MCU,self.R_pinna_MCU,), daemon=True)
+            self.movement_thread_event.clear()
+            self.movement_thread.start()
+        else:
+            self.poutput("Running max and mins, no pinna movement file given...")
+            angles = [self.L_pinna_MCU.min_angle_limits, self.L_pinna_MCU.max_angle_limits]
+            self.pinna_movements = np.array(angles)
+            
+            self.movement_thread_event.set()
+            while self.movement_thread.is_alive():
+                self.movement_thread.join()
+
+            self.movement_thread = threading.Thread(target=run_pinna_instructions,
+                                                    args=(self.movement_thread_event,self.pinna_movements,args.freq,self.L_pinna_MCU,self.R_pinna_MCU,), daemon=True)
+            self.movement_thread_event.clear()
+            self.movement_thread.start()
+
         
+    def do_stop_pinna(self,args):
+        self.movement_thread_event.set()
+
+        if self.movement_thread.is_alive():
+            self.movement_thread.join()
+
             
     
     config_parser = Cmd2ArgumentParser()
@@ -935,8 +994,32 @@ class bb_repl(Cmd):
         except:
             pass
         
+        self.movement_thread_event.set()
+        if self.movement_thread.is_alive():
+            self.movement_thread.join()
         
         return True
+    
+def run_pinna_instructions(stop_event:threading.Event,movement_data, frequency:int,l_pinna:pinnae.PinnaeController,r_pinna : pinnae.PinnaeController = None):
+    right_data = movement_data.copy()
+    sleep_time = 1/frequency
+    current_index = 0
+    max_index = len(movement_data)
+    print("Starting motor loop")
+
+    if r_pinna is not None:
+        right_data[:,5] = movement_data[:,6]
+    
+    while not stop_event.is_set():
+        l_pinna.set_motor_angles(movement_data[current_index])
+        r_pinna.set_motor_angles(right_data[current_index])
+        
+        current_index += 1
+        if current_index >= max_index:
+            current_index = 0
+        
+        time.sleep(sleep_time)
+    print("Exiting motor loop")
             
 if __name__ == '__main__':
     bb = bb_repl()
