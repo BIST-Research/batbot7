@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import sys
 from scipy import signal
 import zlib
+import wave
 
 
 
@@ -310,6 +311,8 @@ class EchoEmitter:
         t = np.linspace(0, duration, DATA_LEN, endpoint=False)
         
         sin_wave = np.sin(2 * np.pi * freq *t)
+
+        print(sin_wave[1:15])
         sin_wave = self.convert_and_range_data(sin_wave,gain,offset)
         
         self.last_upload_type = LAST_CHIRP_DATA.CUSTOM
@@ -319,8 +322,30 @@ class EchoEmitter:
         self.last_method = 'Sine wave'
         
         return [sin_wave,t]
-    
+
+    def gen_wave(self, filename, gain:float = None, offset = None)->np.uint16:
+        with wave.open(filename, "r") as wave_content:
+            raw_frame = np.frombuffer(wave_content.readframes(wave_content.getnframes()), dtype=np.int16)
+            
+            padding = len(raw_frame) % 20
+
+            if (padding > 0):
+                print(padding)
+                print(len(raw_frame))
+                buf = np.empty(20 - padding)
+                buf.fill(0)
+                raw_frame = np.append(raw_frame, buf)
+
+            raw_frame = raw_frame.astype(float)
+            raw_frame /= np.max(raw_frame)
+            print(raw_frame[1:15])
+            data = self.convert_and_range_data(raw_frame.astype(float), gain, offset)
+
+            self.last_upload_type = LAST_CHIRP_DATA.FILE
+            self.last_filename = filename
+            return data
     def convert_and_range_data(self,data:np.ndarray,gain:float = None,offset:float =None)->np.uint16:
+
         data = data - np.min(data)
         data = data/np.max(data)
         
@@ -334,7 +359,6 @@ class EchoEmitter:
             
         data = data*g + of
         
-
         return data.astype(np.uint16)
     
     def get_and_convert_numpy(self,file_name:str,gain:float = None,offset = None)->np.uint16:
