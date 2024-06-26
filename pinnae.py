@@ -17,7 +17,7 @@ except ImportError:
     from fake_spidev import fake_SpiDev as SpiDev
 
 # global variables holding number of motors in A ear
-NUM_PINNAE_MOTORS = 7
+NUM_PINNAE_MOTORS = 8
 
 # setting the limits on each motor
 DEFAULT_MIN_ANGLE_LIMIT = np.int16(-180)
@@ -139,6 +139,10 @@ class PinnaeController:
         # seventh motor
         data_buffer[13] = (self.current_angles[6] >> 8) & 0xff
         data_buffer[14] =  self.current_angles[6] & 0xff
+
+        #eighth motor
+        data_buffer[15] = (self.current_angles[7] >> 8) & 0xff
+        data_buffer[16] = self.current_angles[7] & 0xff
         
         if self.com_type == COM_TYPE.SPI:
             if self.spi:
@@ -192,7 +196,10 @@ class PinnaeController:
         # seventh motor
         data_buffer[13] = (self.current_angles[6] >> 8) & 0xff
         data_buffer[14] =  self.current_angles[6] & 0xff
-        
+        #eighth motor
+        data_buffer[15] = (self.current_angles[7] >> 8) & 0xff
+        data_buffer[16] = self.current_angles[7] & 0xff
+
         if self.com_type == COM_TYPE.SPI:
             if self.spi:
                 self.spi.xfer2(data_buffer)
@@ -246,6 +253,9 @@ class PinnaeController:
         # seventh motor
         data_buffer[13] = (self.current_angles[6] >> 8) & 0xff
         data_buffer[14] =  self.current_angles[6] & 0xff
+        #eighth motor
+        data_buffer[15] = (self.current_angles[7] >> 8) & 0xff
+        data_buffer[16] = self.current_angles[7] & 0xff
         
         # convert the data to list so we can send it
         # write_data = data_buffer.tolist()
