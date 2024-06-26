@@ -65,6 +65,8 @@ import threading
 from serial_helper import get_port_from_serial_num
 
 
+import wave
+
 # showing plots in qt from matlab
 class MplCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
@@ -163,7 +165,7 @@ except ImportError:
 # frequency of dac and adc
 DAC_ADC_FREQ = 1e6
 
-NUM_PINNAE = 7
+NUM_PINNAE = 8
 
 
 class BBGUI(QWidget):
@@ -507,6 +509,7 @@ class BBGUI(QWidget):
         self.chirp_type_CB.addItem('quadratic')
         self.chirp_type_CB.addItem('logarithmic')
         self.chirp_type_CB.addItem('hyperbolic')
+        self.chirp_type_CB.addItem('custom')
         chirp_grid.addWidget(QLabel("Type:"),1,2)
         chirp_grid.addWidget(self.chirp_type_CB,1,3)
         
@@ -863,20 +866,25 @@ class BBGUI(QWidget):
 
     def upload_chirp_PB_Clicked(self):
         """ when clicked"""
-        
         if not self.emitter_connect_PB.isChecked():
             win = QErrorMessage(self)
             win.showMessage("EMITTER IS NOT CONNECTED!")
             return
+        s, t = None, None
+        if (self.chirp_type_CB.currentText() == "custom"):
+            filename, other = QFileDialog.getOpenFileName(self, "Open WAV file", os.getcwd(), "Waveform (*.wav)")
+            
+            s = self.emitter.gen_wave(filename, float(self.chirp_gain_SB.value()), float(self.chirp_offset_SB.value()))
+        else:
+            gain = self.chirp_gain_SB.value()
+            offset = self.chirp_offset_SB.value()
+            
+            fs = self.chirp_start_freq_SB.value()
+            fe = self.chirp_stop_freq_SB.value()
+            tend = self.chirp_duration_SB.value()
+            meth = self.chirp_type_CB.currentText()
+            s,t = self.emitter.gen_chirp(fs*1e3,fe*1e3,tend,method=meth,gain=float(gain),offset=float(offset))
         
-        gain = self.chirp_gain_SB.value()
-        offset = self.chirp_offset_SB.value()
-        
-        fs = self.chirp_start_freq_SB.value()
-        fe = self.chirp_stop_freq_SB.value()
-        tend = self.chirp_duration_SB.value()
-        meth = self.chirp_type_CB.currentText()
-        s,t = self.emitter.gen_chirp(fs*1e3,fe*1e3,tend,method=meth,gain=float(gain),offset=float(offset))
         self.emitter.upload_chirp(s)
         
     def run_PB_Clicked(self):
@@ -959,7 +967,8 @@ class BBGUI(QWidget):
             QGroupBox("Motor 4"),
             QGroupBox("Motor 5"),
             QGroupBox("Motor 6"),
-            QGroupBox("Motor 7")
+            QGroupBox("Motor 7"),
+            QGroupBox("Motor 8")
         ]
 
         self.motor_max_PB = [
@@ -970,6 +979,7 @@ class BBGUI(QWidget):
             QPushButton("Max"),
             QPushButton("Max"),
             QPushButton("Max"),
+            QPushButton("Max")
         ]
         
         self.motor_min_PB = [
@@ -980,9 +990,11 @@ class BBGUI(QWidget):
             QPushButton("Min"),
             QPushButton("Min"),
             QPushButton("Min"),
+            QPushButton("Min")
         ]
 
         self.motor_max_limit_SB = [
+            QSpinBox(),
             QSpinBox(),
             QSpinBox(),
             QSpinBox(),
@@ -999,10 +1011,12 @@ class BBGUI(QWidget):
             QSpinBox(),
             QSpinBox(),
             QSpinBox(),
+            QSpinBox(),
             QSpinBox()
         ]
 
         self.motor_value_SB = [
+            QSpinBox(),
             QSpinBox(),
             QSpinBox(),
             QSpinBox(),
@@ -1020,9 +1034,11 @@ class BBGUI(QWidget):
             QSlider(Qt.Orientation.Vertical),
             QSlider(Qt.Orientation.Vertical),
             QSlider(Qt.Orientation.Vertical),
+            QSlider(Qt.Orientation.Vertical)
         ]
         
         self.motor_set_zero_PB = [
+            QPushButton("Set Zero"),
             QPushButton("Set Zero"),
             QPushButton("Set Zero"),
             QPushButton("Set Zero"),
