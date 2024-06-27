@@ -550,6 +550,12 @@ class BBGUI(QWidget):
         self.time_to_listen_SB.setValue(30)
         chirp_grid.addWidget(self.time_to_listen_SB,1,8)
 
+        self.listen_download_CB = QComboBox()
+        self.listen_download_CB.addItem('numpy')
+        self.listen_download_CB.addItem('wave')
+        chirp_grid.addWidget(QLabel("Listen save as:"),0,9)
+        chirp_grid.addWidget(self.listen_download_CB,0,10)
+
         
         
         chirp_GB.setLayout(chirp_grid)
@@ -870,19 +876,23 @@ class BBGUI(QWidget):
             win = QErrorMessage(self)
             win.showMessage("EMITTER IS NOT CONNECTED!")
             return
+
+        gain = self.chirp_gain_SB.value()
+        offset = self.chirp_offset_SB.value()
+        meth = self.chirp_type_CB.currentText()
         s, t = None, None
-        if (self.chirp_type_CB.currentText() == "custom"):
+        if (meth == "custom"):
             filename, other = QFileDialog.getOpenFileName(self, "Open WAV file", os.getcwd(), "Waveform (*.wav)")
             
-            s = self.emitter.gen_wave(filename, float(self.chirp_gain_SB.value()), float(self.chirp_offset_SB.value()))
+            s,t = self.emitter.gen_wave(filename, float(gain), float(offset))
+           
         else:
-            gain = self.chirp_gain_SB.value()
-            offset = self.chirp_offset_SB.value()
+            
             
             fs = self.chirp_start_freq_SB.value()
             fe = self.chirp_stop_freq_SB.value()
             tend = self.chirp_duration_SB.value()
-            meth = self.chirp_type_CB.currentText()
+            
             s,t = self.emitter.gen_chirp(fs*1e3,fe*1e3,tend,method=meth,gain=float(gain),offset=float(offset))
         
         self.emitter.upload_chirp(s)
@@ -914,11 +924,33 @@ class BBGUI(QWidget):
         os.makedirs(cur_dir)
         self.emitter.save_chirp_info(cur_dir+"/chirp_info.txt")
         
+        locked_listen_choice = self.listen_download_CB.currentText()
         while True:
             raw,L,R = self.listener.listen(listen_time)
             
-            np.save(cur_dir+f"/left_ear_{count}.npy",L)
-            np.save(cur_dir+f"/right_ear_{count}.npy",R)
+            left_ear_filename = cur_dir+f"/left_ear_{count}"
+            right_ear_filename = cur_dir+f"/right_ear_{count}"
+
+            if (locked_listen_choice == "numpy"):
+                np.save(left_ear_filename + ".npy",L)
+                np.save(right_ear_filename + ".npy",R)
+            elif (locked_listen_choice == "wave"):
+                
+                with wave.open(left_ear_filename + ".wav", "wb") as left_ear_file:
+                    left_ear_file.setnchannels(1)
+                    left_ear_file.setsampwidth(2)
+                    left_ear_file.setframerate(1e6)
+                    left_ear_file.writeframes(L.tobytes())
+
+                with wave.open(right_ear_filename + ".wav", "wb") as right_ear_file:
+                    right_ear_file.setnchannels(1)
+                    right_ear_file.setsampwidth(2)
+                    right_ear_file.setframerate(1e6)
+                    right_ear_file.writeframes(R.tobytes())
+                
+                
+
+
             # np.save(self.runs_path+f"/left_ear_{count}.npy",L)
             # np.save(self.runs_path+f"/right_ear_{count}.npy",R)
             

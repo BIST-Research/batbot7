@@ -312,7 +312,6 @@ class EchoEmitter:
         
         sin_wave = np.sin(2 * np.pi * freq *t)
 
-        print(sin_wave[1:15])
         sin_wave = self.convert_and_range_data(sin_wave,gain,offset)
         
         self.last_upload_type = LAST_CHIRP_DATA.CUSTOM
@@ -323,8 +322,9 @@ class EchoEmitter:
         
         return [sin_wave,t]
 
-    def gen_wave(self, filename, gain:float = None, offset = None)->np.uint16:
-        with wave.open(filename, "r") as wave_content:
+    def gen_wave(self, filename, gain:float = None, offset = None)->tuple[np.uint16, np.ndarray]:
+        with wave.open(filename, "rb") as wave_content:
+
             raw_frame = np.frombuffer(wave_content.readframes(wave_content.getnframes()), dtype=np.int16)
             
             padding = len(raw_frame) % 20
@@ -334,13 +334,17 @@ class EchoEmitter:
                 buf.fill(0)
                 raw_frame = np.append(raw_frame, buf)
 
+            length = len(raw_frame)
+            t = np.linspace(0, length / 1e6, length, endpoint=False)
+
             raw_frame = raw_frame.astype(float)
             raw_frame /= np.max(raw_frame)
             data = self.convert_and_range_data(raw_frame, gain, offset)
 
             self.last_upload_type = LAST_CHIRP_DATA.FILE
             self.last_filename = filename
-            return data
+            return [data, t]
+        return [None, None]
     def convert_and_range_data(self,data:np.ndarray,gain:float = None,offset:float =None)->np.uint16:
 
         data = data - np.min(data)
