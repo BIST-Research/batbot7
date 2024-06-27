@@ -330,16 +330,13 @@ class EchoEmitter:
             padding = len(raw_frame) % 20
 
             if (padding > 0):
-                print(padding)
-                print(len(raw_frame))
                 buf = np.empty(20 - padding)
                 buf.fill(0)
                 raw_frame = np.append(raw_frame, buf)
 
             raw_frame = raw_frame.astype(float)
             raw_frame /= np.max(raw_frame)
-            print(raw_frame[1:15])
-            data = self.convert_and_range_data(raw_frame.astype(float), gain, offset)
+            data = self.convert_and_range_data(raw_frame, gain, offset)
 
             self.last_upload_type = LAST_CHIRP_DATA.FILE
             self.last_filename = filename
