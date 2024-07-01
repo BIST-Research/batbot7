@@ -885,7 +885,7 @@ class BBGUI(QWidget):
             filename, other = QFileDialog.getOpenFileName(self, "Open WAV file", os.getcwd(), "Waveform (*.wav)")
             
             s,t = self.emitter.gen_wave(filename, float(gain), float(offset))
-           
+
         else:
             
             
@@ -896,6 +896,7 @@ class BBGUI(QWidget):
             s,t = self.emitter.gen_chirp(fs*1e3,fe*1e3,tend,method=meth,gain=float(gain),offset=float(offset))
         
         self.emitter.upload_chirp(s)
+        self.emitter.chirp()
         
     def run_PB_Clicked(self):
         """ """
@@ -927,6 +928,7 @@ class BBGUI(QWidget):
         locked_listen_choice = self.listen_download_CB.currentText()
         while True:
             raw,L,R = self.listener.listen(listen_time)
+
             
             left_ear_filename = cur_dir+f"/left_ear_{count}"
             right_ear_filename = cur_dir+f"/right_ear_{count}"
@@ -935,19 +937,23 @@ class BBGUI(QWidget):
                 np.save(left_ear_filename + ".npy",L)
                 np.save(right_ear_filename + ".npy",R)
             elif (locked_listen_choice == "wave"):
-                
+                L_bytes = L.tobytes()
+                R_bytes = R.tobytes()
                 with wave.open(left_ear_filename + ".wav", "wb") as left_ear_file:
                     left_ear_file.setnchannels(1)
                     left_ear_file.setsampwidth(2)
                     left_ear_file.setframerate(1e6)
+                    left_ear_file.setnframes(len(L_bytes))
                     left_ear_file.writeframes(L.tobytes())
+                    left_ear_file.close()
 
                 with wave.open(right_ear_filename + ".wav", "wb") as right_ear_file:
                     right_ear_file.setnchannels(1)
                     right_ear_file.setsampwidth(2)
                     right_ear_file.setframerate(1e6)
+                    right_ear_file.setnframes(len(R_bytes))
                     right_ear_file.writeframes(R.tobytes())
-                
+                    right_ear_file.close()
                 
 
 
