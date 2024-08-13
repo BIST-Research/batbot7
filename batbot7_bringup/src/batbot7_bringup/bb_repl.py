@@ -35,7 +35,7 @@ import logging
 import serial.tools.list_ports
 from PyQt6.QtWidgets import QApplication, QWidget
 import threading
-import bb_gui
+import batbot7_bringup.bb_gui as bb_gui
 import os
 from scipy import signal
 import time

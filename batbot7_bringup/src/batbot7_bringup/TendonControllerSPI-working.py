@@ -1,7 +1,4 @@
-"""Current working tendon controller for the BatBot. This system works with SPI to control one pinnae.
-
-"""
-
+"""Current working tendon controller for the BatBot. This system works with SPI to control one pinnae."""
 
 import typing
 from PyQt6.QtWidgets import (
@@ -22,10 +19,11 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QAbstractItemView,
     QMenu,
-    QLineEdit
+    QLineEdit,
 )
-from PyQt6.QtCore import Qt, QFile, QTextStream, QThread, pyqtSignal,QObject
-import sys,os
+from PyQt6.QtCore import Qt, QFile, QTextStream, QThread, pyqtSignal, QObject
+
+import sys, os
 import serial
 import serial.tools.list_ports
 import time
@@ -33,9 +31,10 @@ import numpy as np
 
 # logging stuff
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) )
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # for developing on not the PI we create fake library
 # that mimics spidev
 try:
@@ -45,24 +44,20 @@ except ImportError:
     from fake_spidev import fake_SpiDev as SpiDev
 
 
-
-
 class Widget(QWidget):
-    
     # thread stuff
     serialThread = None
     instructionThread = None
     instructionThreadRunning = False
-    
+
     row2 = None
     allMotorsBox = None
     instructionsBox = None
-    
 
     spiBus = 0
     spiDev = 0
     spi = SpiDev()
-    
+
     def __init__(self):
         QWidget.__init__(self)
         # ~ self.setGeometry(0, 0, 400, 400)
@@ -80,7 +75,6 @@ class Widget(QWidget):
 
         # add mapped instruction box
         self.add_allMotor_and_instruction_box()
-        
 
         # set final layout
         self.setLayout(self.mainVerticalLayout)
@@ -107,16 +101,14 @@ class Widget(QWidget):
 
         # push box to main layout
         self.mainVerticalLayout.addWidget(serialGB)
-        
 
-        self.spi.open(self.spiBus,self.spiDev)
+        self.spi.open(self.spiBus, self.spiDev)
         self.spi.mode = 0
         self.spi.max_speed_hz = 500000
 
         # connect callbacks
         # ~ self.serialObj = None
         # ~ self.isSerialObjConnected = False
-
 
     def add_indiviual_motor_control_box(self):
         """Adds individual motor control box"""
@@ -155,7 +147,6 @@ class Widget(QWidget):
             QPushButton("Max"),
             QPushButton("Max"),
         ]
-
 
         # set value to min
         self.setMotorAngleMinPB = [
@@ -334,17 +325,31 @@ class Widget(QWidget):
 
         # connect callbacks
         #   slider and spinbox value changes
-        self.allMotorAngleSB.editingFinished.connect(self.allMotorAngleSB_editingFinished_callback)
-        self.allMotorAngleSlider.valueChanged.connect(self.allMotorAngleSlider_valueChanged_callback)
-        
+        self.allMotorAngleSB.editingFinished.connect(
+            self.allMotorAngleSB_editingFinished_callback
+        )
+        self.allMotorAngleSlider.valueChanged.connect(
+            self.allMotorAngleSlider_valueChanged_callback
+        )
+
         #   max min zero buttons
-        self.setAllMotorsAngleZeroPB.pressed.connect( lambda: self.allMotorAngleSlider.setValue(0))
-        self.setAllMotorsAngleMaxPB.pressed.connect(lambda: self.allMotorAngleSlider.setValue(self.allMaxMotorAngleSB.value()))
-        self.setAllMotorsAngleMinPB.pressed.connect(lambda: self.allMotorAngleSlider.setValue(self.allMinMotorAngleSB.value()))
-        
+        self.setAllMotorsAngleZeroPB.pressed.connect(
+            lambda: self.allMotorAngleSlider.setValue(0)
+        )
+        self.setAllMotorsAngleMaxPB.pressed.connect(
+            lambda: self.allMotorAngleSlider.setValue(self.allMaxMotorAngleSB.value())
+        )
+        self.setAllMotorsAngleMinPB.pressed.connect(
+            lambda: self.allMotorAngleSlider.setValue(self.allMinMotorAngleSB.value())
+        )
+
         # limits change
-        self.allMaxMotorAngleSB.editingFinished.connect(self.allMaxMotorAngleSB_editingFinished_callback)
-        self.allMinMotorAngleSB.editingFinished.connect(self.allMinMotorAngleSB_editingFinished_callback)
+        self.allMaxMotorAngleSB.editingFinished.connect(
+            self.allMaxMotorAngleSB_editingFinished_callback
+        )
+        self.allMinMotorAngleSB.editingFinished.connect(
+            self.allMinMotorAngleSB_editingFinished_callback
+        )
 
         # ----------------------------------------------------
         instGB = QGroupBox("Instructions")
@@ -355,23 +360,21 @@ class Widget(QWidget):
         self.serialOutputTE.setFixedWidth(300)
         self.serialOutputTE.setFixedHeight(275)
         instHLay.addWidget(self.serialOutputTE)
-        
+
         # yaml instructions
         self.inputT = QTableWidget()
         self.inputT.setRowCount(1)
         self.inputT.setColumnCount(6)
-        
-        
-        
+
         # connect callback
         self.inputT.cellChanged.connect(self.inputT_cellChanged_callback)
-        
+
         # set zero values
         for i in range(6):
             intNum = QTableWidgetItem()
-            intNum.setData(0,0)
-            self.inputT.setItem(0,i,intNum)
-            
+            intNum.setData(0, 0)
+            self.inputT.setItem(0, i, intNum)
+
         # add contenx menu
         self.inputT.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.inputT.customContextMenuRequested.connect(self.inputT_contextMenu)
@@ -406,7 +409,7 @@ class Widget(QWidget):
         self.cycleCountSB = QSpinBox()
         self.cycleCountSB.setDisabled(True)
         self.cycleCountSB.setSuffix(" cycles")
-        self.cycleCountSB.setRange(0,2147483647)
+        self.cycleCountSB.setRange(0, 2147483647)
         buttonVLay.addWidget(self.cycleCountSB)
 
         # add row button
@@ -414,12 +417,12 @@ class Widget(QWidget):
         self.addRowPB.pressed.connect(self.addRowPB_pressed_callback)
         self.addRowPB.setToolTip("add new row to instruction table")
         buttonVLay.addWidget(self.addRowPB)
-        
+
         # duplicate row button
         self.duplicateRowPB = QPushButton("Duplicate")
         self.duplicateRowPB.setToolTip("Duplicates highlighted row")
         buttonVLay.addWidget(self.duplicateRowPB)
-        
+
         # copy current angles
         self.copyCurAnglesPB = QPushButton("Copy Current Angles")
         self.copyCurAnglesPB.setToolTip("copies current angles into row")
@@ -436,7 +439,7 @@ class Widget(QWidget):
 
         instGB.setLayout(instHLay)
         rowLay.addWidget(instGB)
-        
+
         self.instructionsBox = instGB
 
         self.mainVerticalLayout.addLayout(rowLay)
@@ -487,12 +490,24 @@ class Widget(QWidget):
         )
 
         # connect max value button
-        self.setMotorAngleMaxPB[0].pressed.connect(lambda: self.motorAngleSliders[0].setValue(self.maxMotorAngleSB[0].value()))
-        self.setMotorAngleMaxPB[1].pressed.connect(lambda: self.motorAngleSliders[1].setValue(self.maxMotorAngleSB[1].value()))
-        self.setMotorAngleMaxPB[2].pressed.connect(lambda: self.motorAngleSliders[2].setValue(self.maxMotorAngleSB[2].value()))
-        self.setMotorAngleMaxPB[3].pressed.connect(lambda: self.motorAngleSliders[3].setValue(self.maxMotorAngleSB[3].value()))
-        self.setMotorAngleMaxPB[4].pressed.connect(lambda: self.motorAngleSliders[4].setValue(self.maxMotorAngleSB[4].value()))
-        self.setMotorAngleMaxPB[5].pressed.connect(lambda: self.motorAngleSliders[5].setValue(self.maxMotorAngleSB[5].value()))
+        self.setMotorAngleMaxPB[0].pressed.connect(
+            lambda: self.motorAngleSliders[0].setValue(self.maxMotorAngleSB[0].value())
+        )
+        self.setMotorAngleMaxPB[1].pressed.connect(
+            lambda: self.motorAngleSliders[1].setValue(self.maxMotorAngleSB[1].value())
+        )
+        self.setMotorAngleMaxPB[2].pressed.connect(
+            lambda: self.motorAngleSliders[2].setValue(self.maxMotorAngleSB[2].value())
+        )
+        self.setMotorAngleMaxPB[3].pressed.connect(
+            lambda: self.motorAngleSliders[3].setValue(self.maxMotorAngleSB[3].value())
+        )
+        self.setMotorAngleMaxPB[4].pressed.connect(
+            lambda: self.motorAngleSliders[4].setValue(self.maxMotorAngleSB[4].value())
+        )
+        self.setMotorAngleMaxPB[5].pressed.connect(
+            lambda: self.motorAngleSliders[5].setValue(self.maxMotorAngleSB[5].value())
+        )
 
         # connect min value button
         self.setMotorAngleMinPB[0].pressed.connect(
@@ -573,8 +588,6 @@ class Widget(QWidget):
         self.setNewMotorZeroPB[5].pressed.connect(
             lambda: self.setNewMotorZeroPB_pressed_callback(5)
         )
-        
-        
 
     def motorAngleSB_editingFinished_callback(self, index):
         """Sets the slider and spin box values to 0"""
@@ -615,44 +628,41 @@ class Widget(QWidget):
 
     def setNewMotorZeroPB_pressed_callback(self, index):
         """User requests that current angle be set as the zero point"""
-        
-        # change the limits 
-        self.maxMotorAngleSB[index].setValue(180) 
+
+        # change the limits
+        self.maxMotorAngleSB[index].setValue(180)
         self.minMotorAngleSB[index].setValue(-180)
-        
+
         # set the current value as zero
         self.motorAngleSliders[index].setValue(0)
         self.motorAngleSB[index].setValue(0)
-        
-        writeData = np.zeros(13,dtype=np.byte)
-    
-        # first index is used for telling motors to 
+
+        writeData = np.zeros(13, dtype=np.byte)
+
+        # first index is used for telling motors to
         # set their current encoder positions as zero
-        writeData[0] = index +1
-        
-        writeData[1] = (self.motorAngleSB[0].value() >> 8) & 0xff
-        writeData[2] = (self.motorAngleSB[0].value()) & 0xff
-        
-        writeData[3] = (self.motorAngleSB[1].value() >> 8) & 0xff
-        writeData[4] = (self.motorAngleSB[1].value()) & 0xff
-            
-        writeData[5] = (self.motorAngleSB[2].value() >> 8) & 0xff
-        writeData[6] = (self.motorAngleSB[2].value()) & 0xff
-        
-        writeData[7] = (self.motorAngleSB[3].value() >> 8) & 0xff
-        writeData[8] = (self.motorAngleSB[3].value()) & 0xff
-        
-        writeData[9] =  (self.motorAngleSB[4].value() >> 8) & 0xff
-        writeData[10] = (self.motorAngleSB[4].value()) & 0xff
-        
-        writeData[11] = (self.motorAngleSB[5].value() >> 8) & 0xff
-        writeData[12] = (self.motorAngleSB[5].value()) & 0xff
+        writeData[0] = index + 1
+
+        writeData[1] = (self.motorAngleSB[0].value() >> 8) & 0xFF
+        writeData[2] = (self.motorAngleSB[0].value()) & 0xFF
+
+        writeData[3] = (self.motorAngleSB[1].value() >> 8) & 0xFF
+        writeData[4] = (self.motorAngleSB[1].value()) & 0xFF
+
+        writeData[5] = (self.motorAngleSB[2].value() >> 8) & 0xFF
+        writeData[6] = (self.motorAngleSB[2].value()) & 0xFF
+
+        writeData[7] = (self.motorAngleSB[3].value() >> 8) & 0xFF
+        writeData[8] = (self.motorAngleSB[3].value()) & 0xFF
+
+        writeData[9] = (self.motorAngleSB[4].value() >> 8) & 0xFF
+        writeData[10] = (self.motorAngleSB[4].value()) & 0xFF
+
+        writeData[11] = (self.motorAngleSB[5].value() >> 8) & 0xFF
+        writeData[12] = (self.motorAngleSB[5].value()) & 0xFF
         writeData = writeData.tolist()
 
-    
         self.spi.xfer2(writeData)
-        
-
 
     # ---------------------------------------------------------------------------------
     # all motor control callbacks
@@ -686,113 +696,116 @@ class Widget(QWidget):
     # instruction table stuff
     def addRowPB_pressed_callback(self):
         """Adds new row to inputT, making the new table all 0's"""
-        rows = self.inputT.rowCount()+1
+        rows = self.inputT.rowCount() + 1
         self.inputT.setRowCount(rows)
         self.inputT.update()
         for i in range(6):
             intNum = QTableWidgetItem()
-            intNum.setData(0,0)
-            self.inputT.setItem(rows-1,i,intNum)
+            intNum.setData(0, 0)
+            self.inputT.setItem(rows - 1, i, intNum)
         logging.debug(f"inputT rows {rows}")
-        
+
     def startInstPB_pressed_callback(self):
         """processes input table for usable data and sends to microcontroller"""
         logging.debug("startInstPB callback")
-        
 
         if not self.instructionThreadRunning:
-             # ~ dataArray = np.zeros((self.inputT.rowCount(),12),dtype=np.byte)
-             dataArray = [bytearray(13) for _ in range(self.inputT.rowCount())]
-             
-             for row in range(self.inputT.rowCount()):
-                 # this is used to tell mcu which motor to set new zero position
-                 dataArray[row][0] = 0
+            # ~ dataArray = np.zeros((self.inputT.rowCount(),12),dtype=np.byte)
+            dataArray = [bytearray(13) for _ in range(self.inputT.rowCount())]
 
-                 val = int(self.inputT.item(row,0).text())
-                 dataArray[row][1] = (val >> 8) & 0xff
-                 dataArray[row][2] = val & 0xff
-                 val = int(self.inputT.item(row,1).text())
-                 dataArray[row][3] = (val >> 8) & 0xff
-                 dataArray[row][4] = val & 0xff
-                 val = int(self.inputT.item(row,2).text())
-                 dataArray[row][5] = (val >> 8) & 0xff
-                 dataArray[row][6] = val & 0xff
-                 val = int(self.inputT.item(row,3).text())
-                 dataArray[row][7] = (val >> 8) & 0xff
-                 dataArray[row][8] = val & 0xff
-                 val = int(self.inputT.item(row,4).text())
-                 dataArray[row][9] = (val >> 8) & 0xff
-                 dataArray[row][10] = val & 0xff
-                 val = int(self.inputT.item(row,5).text())
-                 dataArray[row][11] = (val >> 8) & 0xff
-                 dataArray[row][12] = val & 0xff
-                 
-        
-             # print(dataArray)
-             self.instructionThread = RunInstructionsThread(dataArray,self.timeStepSB.value(),self.spi)
-             self.instructionThread.start()
-             self.instructionThread.cycle_complete.connect(self.cycle_complete_emit_callback)
-             self.instructionThreadRunning = True
-             self.startInstPB.setText("Stop")
+            for row in range(self.inputT.rowCount()):
+                # this is used to tell mcu which motor to set new zero position
+                dataArray[row][0] = 0
+
+                val = int(self.inputT.item(row, 0).text())
+                dataArray[row][1] = (val >> 8) & 0xFF
+                dataArray[row][2] = val & 0xFF
+                val = int(self.inputT.item(row, 1).text())
+                dataArray[row][3] = (val >> 8) & 0xFF
+                dataArray[row][4] = val & 0xFF
+                val = int(self.inputT.item(row, 2).text())
+                dataArray[row][5] = (val >> 8) & 0xFF
+                dataArray[row][6] = val & 0xFF
+                val = int(self.inputT.item(row, 3).text())
+                dataArray[row][7] = (val >> 8) & 0xFF
+                dataArray[row][8] = val & 0xFF
+                val = int(self.inputT.item(row, 4).text())
+                dataArray[row][9] = (val >> 8) & 0xFF
+                dataArray[row][10] = val & 0xFF
+                val = int(self.inputT.item(row, 5).text())
+                dataArray[row][11] = (val >> 8) & 0xFF
+                dataArray[row][12] = val & 0xFF
+
+            # print(dataArray)
+            self.instructionThread = RunInstructionsThread(
+                dataArray, self.timeStepSB.value(), self.spi
+            )
+            self.instructionThread.start()
+            self.instructionThread.cycle_complete.connect(
+                self.cycle_complete_emit_callback
+            )
+            self.instructionThreadRunning = True
+            self.startInstPB.setText("Stop")
         else:
-             self.instructionThreadRunning = False
-             self.startInstPB.setText("Start")
-             if self.instructionThread is not None and self.instructionThread.isRunning():
-                 self.instructionThread.stop()
-                
-    def cycle_complete_emit_callback(self,dataIn):
+            self.instructionThreadRunning = False
+            self.startInstPB.setText("Start")
+            if (
+                self.instructionThread is not None
+                and self.instructionThread.isRunning()
+            ):
+                self.instructionThread.stop()
+
+    def cycle_complete_emit_callback(self, dataIn):
         self.cycleCountSB.setValue(dataIn)
-        
 
     def copyCurAnglesPB_pressed_callback(self):
         """Copies the current angles into table row"""
         logging.debug("copyCurAnglesPB called")
-        rows = self.inputT.rowCount()+1
+        rows = self.inputT.rowCount() + 1
         self.inputT.setRowCount(rows)
         self.inputT.update()
         for i in range(6):
             intNum = QTableWidgetItem()
-            intNum.setData(0,self.motorAngleSB[i].value())
-            self.inputT.setItem(rows-1,i,intNum)
-            
-    def inputT_cellChanged_callback(self,row,column):
-        """When values are changed in the table function is called to 
-        check if they are valid and not out of the scope """
+            intNum.setData(0, self.motorAngleSB[i].value())
+            self.inputT.setItem(rows - 1, i, intNum)
+
+    def inputT_cellChanged_callback(self, row, column):
+        """When values are changed in the table function is called to
+        check if they are valid and not out of the scope"""
         logging.debug("inputT cellChanged")
-        
+
         # check against its limits
-        newVal = float(self.inputT.item(row,column).text())
+        newVal = float(self.inputT.item(row, column).text())
         if newVal > self.maxMotorAngleSB[column].value():
             # clamp the value
             newItem = QTableWidgetItem()
-            newItem.setData(0,self.maxMotorAngleSB[column].value())
-            self.inputT.setItem(row,column,newItem)
+            newItem.setData(0, self.maxMotorAngleSB[column].value())
+            self.inputT.setItem(row, column, newItem)
             logging.debug("clamped to max")
-     
+
         # clamp min value
         if newVal < self.minMotorAngleSB[column].value():
             # clamp the value
             newItem = QTableWidgetItem()
-            newItem.setData(0,self.minMotorAngleSB[column].value())
-            self.inputT.setItem(row,column,newItem)
+            newItem.setData(0, self.minMotorAngleSB[column].value())
+            self.inputT.setItem(row, column, newItem)
             logging.debug("clamped to min")
-        
+
     def removeRowPB_callback(self):
         """removes a row from the instruction table (instT)"""
         if self.inputT.rowCount() > 1:
             self.inputT.setRowCount(self.inputT.rowCount() - 1)
-            
-            
-    def inputT_contextMenu(self,position):
+
+    def inputT_contextMenu(self, position):
         context_menu = QMenu()
-        
+
         add_row_action = context_menu.addAction("Add Row")
         delete_row_action = context_menu.addAction("Delete Row")
         duplicate_row_action = context_menu.addAction("Duplicate Row")
         paste_max_action = context_menu.addAction("Paste Max's")
         paste_min_action = context_menu.addAction("Paste Min's")
         action = context_menu.exec(self.inputT.viewport().mapToGlobal(position))
-        
+
         if action == add_row_action:
             self.addRowPB_pressed_callback()
         elif action == delete_row_action:
@@ -810,85 +823,83 @@ class Widget(QWidget):
             # remove the row
             self.inputT.removeRow(self.inputT.currentRow())
             logging.debug("inputT_CM_delete_row ")
-        
+
     def inputT_CM_duplicate_row(self):
         """For context menu will duplicate the selected line"""
         selected_row = self.inputT.currentRow()
         num_rows = self.inputT.rowCount()
-        
+
         if selected_row >= 0:
             # duplicate lines
             if selected_row >= 0:
-                row_items = [self.inputT.item(selected_row, col).text() for col in range(self.inputT.columnCount())]
+                row_items = [
+                    self.inputT.item(selected_row, col).text()
+                    for col in range(self.inputT.columnCount())
+                ]
                 self.inputT.setRowCount(num_rows + 1)
-                
+
                 for col, text in enumerate(row_items):
                     newItem = QTableWidgetItem()
-                    newItem.setData(0,float(text))
+                    newItem.setData(0, float(text))
                     self.inputT.setItem(num_rows, col, newItem)
-                    
+
     def inputT_CM_paste_max(self):
         """pastes the max values into the row from the spinner box"""
         selected_row = self.inputT.currentRow()
-        
+
         if selected_row >= 0:
             logging.debug("inputT CM past max")
             for col, maxSpinner in enumerate(self.maxMotorAngleSB):
                 newItem = QTableWidgetItem()
-                newItem.setData(0,float(maxSpinner.value()))
-                self.inputT.setItem(selected_row,col,newItem)
-        
+                newItem.setData(0, float(maxSpinner.value()))
+                self.inputT.setItem(selected_row, col, newItem)
+
     def inputT_CM_paste_min(self):
         """pastes the min values into the row from the spinner box"""
         selected_row = self.inputT.currentRow()
-        
+
         if selected_row >= 0:
             logging.debug("inputT CM paste min")
             for col, minSpinner in enumerate(self.minMotorAngleSB):
                 newItem = QTableWidgetItem()
-                newItem.setData(0,float(minSpinner.value()))
-                self.inputT.setItem(selected_row,col,newItem)
-    # ---------------------------------------------------------------------------------
+                newItem.setData(0, float(minSpinner.value()))
+                self.inputT.setItem(selected_row, col, newItem)
 
+    # ---------------------------------------------------------------------------------
 
     def writeAllSPIData(self):
         """writes all spi data to device"""
         logging.debug("writeAllSPIData")
         # ~ writeData = bytearray(12)
-        writeData = np.zeros(13,dtype=np.byte)
-    
-        # first index is used for telling motors to 
+        writeData = np.zeros(13, dtype=np.byte)
+
+        # first index is used for telling motors to
         # set their current encoder positions as zero
         writeData[0] = 0
-        
-        writeData[1] = (self.motorAngleSB[0].value() >> 8) & 0xff
-        writeData[2] = (self.motorAngleSB[0].value()) & 0xff
-        
-        writeData[3] = (self.motorAngleSB[1].value() >> 8) & 0xff
-        writeData[4] = (self.motorAngleSB[1].value()) & 0xff
-            
-        writeData[5] = (self.motorAngleSB[2].value() >> 8) & 0xff
-        writeData[6] = (self.motorAngleSB[2].value()) & 0xff
-        
-        writeData[7] = (self.motorAngleSB[3].value() >> 8) & 0xff
-        writeData[8] = (self.motorAngleSB[3].value()) & 0xff
-        
-        writeData[9] = (self.motorAngleSB[4].value() >> 8) & 0xff
-        writeData[10] = (self.motorAngleSB[4].value()) & 0xff
-        
-        writeData[11] = (self.motorAngleSB[5].value() >> 8) & 0xff
-        writeData[12] = (self.motorAngleSB[5].value()) & 0xff
+
+        writeData[1] = (self.motorAngleSB[0].value() >> 8) & 0xFF
+        writeData[2] = (self.motorAngleSB[0].value()) & 0xFF
+
+        writeData[3] = (self.motorAngleSB[1].value() >> 8) & 0xFF
+        writeData[4] = (self.motorAngleSB[1].value()) & 0xFF
+
+        writeData[5] = (self.motorAngleSB[2].value() >> 8) & 0xFF
+        writeData[6] = (self.motorAngleSB[2].value()) & 0xFF
+
+        writeData[7] = (self.motorAngleSB[3].value() >> 8) & 0xFF
+        writeData[8] = (self.motorAngleSB[3].value()) & 0xFF
+
+        writeData[9] = (self.motorAngleSB[4].value() >> 8) & 0xFF
+        writeData[10] = (self.motorAngleSB[4].value()) & 0xFF
+
+        writeData[11] = (self.motorAngleSB[5].value() >> 8) & 0xFF
+        writeData[12] = (self.motorAngleSB[5].value()) & 0xFF
         writeData = writeData.tolist()
 
-    
         self.spi.xfer2(writeData)
 
-
-        
-
-    def serialThread_emit_callback(self,dataIn):
+    def serialThread_emit_callback(self, dataIn):
         self.serialOutputTE.append(dataIn)
-        
 
     def enableWidgets(self, isEnabled):
         """enables or disables all the widgets"""
@@ -902,22 +913,22 @@ class Widget(QWidget):
         the serial port and thread get closed safely"""
         logging.debug("Close event called")
 
-        
         # close the thread
         if self.serialThread is not None and self.serialThread.isRunning():
             self.serialThread.stop()
-            
+
         # check if serial object has been created and try to close it
         # ~ if self.serialObj is not None:
-            # ~ self.serialObj.close()
-            # ~ logging.debug("Serial object is closed")
+        # ~ self.serialObj.close()
+        # ~ logging.debug("Serial object is closed")
 
         event.accept()
 
 
 class ReadSerialThread(QThread):
     serialData = pyqtSignal(str)
-    def __init__(self,serialDev):
+
+    def __init__(self, serialDev):
         QThread.__init__(self)
         self.runThread = True
         self.serialObj = serialDev
@@ -929,42 +940,43 @@ class ReadSerialThread(QThread):
             # print(data)
             self.serialData.emit(data)
         logging.debug("ReadSerialThread exiting")
-                
+
     def stop(self):
         self.runThread = False
         self.terminate()
 
+
 class RunInstructionsThread(QThread):
     cycle_complete = pyqtSignal(int)
 
-    def __init__(self,dataArray,freq,spiObj):
+    def __init__(self, dataArray, freq, spiObj):
         QThread.__init__(self)
         self.data = dataArray
-        self.timeBetween = 1/freq
+        self.timeBetween = 1 / freq
         self.runThread = True
         self.curIndex = 0
         self.maxIndex = len(dataArray)
         self.spiObj = spiObj
         self.cycle_count = 0
-        
+
     def run(self):
         logging.debug("RunInstructionsThread starting")
         while self.runThread:
-            
             self.spiObj.xfer2(self.data[self.curIndex])
-            self.curIndex+=1
+            self.curIndex += 1
             if self.curIndex >= self.maxIndex:
                 self.curIndex = 0
                 self.cycle_count += 1
                 self.cycle_complete.emit(self.cycle_count)
-            
+
             time.sleep(self.timeBetween)
-            
+
         logging.debug("RunInstructionsThread exiting")
-        
+
     def stop(self):
         self.runThread = False
         self.terminate()
+
 
 if __name__ == "__main__":
     app = QApplication([])

@@ -1,3 +1,9 @@
+/**
+ * @file
+ * 
+ * This file does something???
+ */
+
 #include <Arduino.h>
 #include <ADC.h>
 
@@ -6,12 +12,12 @@
 
 #define ADC_DUAL_ADCS
 
-const int readPin_adc_0 = A0;
-const int readPin_adc_1 = A2;
-const int emit_chirp_pin = 17;
-const int itsy_emitting_chirp = 18;
+const int readPin_adc_0 = A0; /** The pin for adc 0 */
+const int readPin_adc_1 = A2; /** The pin for adc 1 */
+const int emit_chirp_pin = 17;  /** This pin does something */
+const int itsy_emitting_chirp = 18; /** This pin does something */
 
-ADC *adc = new ADC(); // adc object
+ADC *adc = new ADC();
 
 extern void dumpDMA_structures(DMABaseClass *dmabc);
 
@@ -34,18 +40,94 @@ volatile uint16_t uart_send_buffer[UART_BUF_SIZE];
 
 void GetData(bool);
 
-void print_debug_information();
-void ProcessAnalogData(AnalogBufferDMA *pabdma, int8_t adc_num);
+// void print_debug_information();
 
+// void ProcessAnalogData(AnalogBufferDMA *pabdma, int8_t adc_num);
+
+/**
+ * @brief Enum containing host serial commands
+ */
 enum LISTENER_SERIAL_CMD
 {
-  NONE = 0,
-  START_LISTEN = 1,
-  STOP_LISTEN = 2,
-  ACK_REQ = 3,
-  ACK = 4,
-  ERROR = 100
+  NONE = 0,           /** No command from host */
+  START_LISTEN = 1,   /** start recording */
+  STOP_LISTEN = 2,    /** stop recording */
+  ACK_REQ = 3,        /** acknowledge request */
+  ACK = 4,            /** acknowledge */
+  ERROR = 100         /** error */
 };
+
+/**
+ * @brief
+ * 
+ * Long description
+ * 
+ * @param send a bool
+ */
+void GetData(bool send)
+{
+  volatile uint16_t *adc0_pbuffer = abdma1.bufferLastISRFilled();
+  volatile uint16_t *adc0_end_pbuffer = abdma1.bufferCountLastISRFilled() + adc0_pbuffer;
+
+  volatile uint16_t *adc1_pbuffer = abdma2.bufferLastISRFilled();
+  volatile uint16_t *adc1_end_pbuffer = abdma2.bufferCountLastISRFilled() + adc1_pbuffer;
+
+  if ((uint32_t)adc0_pbuffer >= 0x20200000u)
+    arm_dcache_delete((void *)adc0_pbuffer, sizeof(dma_adc_buff1));
+  if ((uint32_t)adc1_pbuffer >= 0x20200000u)
+    arm_dcache_delete((void *)adc1_pbuffer, sizeof(dma_adc_buff1));
+
+  // uart_send_buffer[0] = 0x00;
+  // uart_send_buffer[1] = ('L' << 8) | 'E';
+  // size_t index = 3;
+  size_t index = 0;
+
+  while (adc0_pbuffer < adc0_end_pbuffer)
+  {
+    uart_send_buffer[index] = *adc0_pbuffer;
+    adc0_pbuffer++;
+    index += 2;
+  }
+  // uart_send_buffer[2] = index;
+
+  // index = UART_BUF_SIZE/2;
+  // uart_send_buffer[index] = ('R'<<8)
+  index = 1;
+  while (adc1_pbuffer < adc1_end_pbuffer)
+  {
+    uart_send_buffer[index] = *adc1_pbuffer;
+    adc1_pbuffer++;
+    index += 2;
+  }
+
+  index = UART_BUF_SIZE;
+
+  // Serial.println(abdma1.interruptDeltaTime());
+
+  abdma1.clearInterrupt();
+  abdma2.clearInterrupt();
+
+  // send data
+  if (!send)
+  {
+    // clear flags
+    Serial.flush();
+    return;
+  }
+
+  for (size_t i = 0; i < index; i++)
+  {
+    Serial.write(uart_send_buffer[i] & 0xff);
+    Serial.write(uart_send_buffer[i] >> 8 & 0xff);
+    if (i % 64 == 0)
+    {
+      Serial.send_now();
+      Serial.flush();
+    }
+  }
+  Serial.send_now();
+  Serial.flush();
+}
 
 void setup()
 {
@@ -94,6 +176,7 @@ void setup()
 
   digitalWriteFast(LED_BUILTIN, LOW);
 }
+
 
 volatile bool sendData = false;
 unsigned long sendStartTime = 0;
@@ -187,69 +270,4 @@ void loop()
     //   }
     // }
   }
-}
-
-void GetData(bool send)
-{
-  volatile uint16_t *adc0_pbuffer = abdma1.bufferLastISRFilled();
-  volatile uint16_t *adc0_end_pbuffer = abdma1.bufferCountLastISRFilled() + adc0_pbuffer;
-
-  volatile uint16_t *adc1_pbuffer = abdma2.bufferLastISRFilled();
-  volatile uint16_t *adc1_end_pbuffer = abdma2.bufferCountLastISRFilled() + adc1_pbuffer;
-
-  if ((uint32_t)adc0_pbuffer >= 0x20200000u)
-    arm_dcache_delete((void *)adc0_pbuffer, sizeof(dma_adc_buff1));
-  if ((uint32_t)adc1_pbuffer >= 0x20200000u)
-    arm_dcache_delete((void *)adc1_pbuffer, sizeof(dma_adc_buff1));
-
-  // uart_send_buffer[0] = 0x00;
-  // uart_send_buffer[1] = ('L' << 8) | 'E';
-  // size_t index = 3;
-  size_t index = 0;
-
-  while (adc0_pbuffer < adc0_end_pbuffer)
-  {
-    uart_send_buffer[index] = *adc0_pbuffer;
-    adc0_pbuffer++;
-    index += 2;
-  }
-  // uart_send_buffer[2] = index;
-
-  // index = UART_BUF_SIZE/2;
-  // uart_send_buffer[index] = ('R'<<8)
-  index = 1;
-  while (adc1_pbuffer < adc1_end_pbuffer)
-  {
-    uart_send_buffer[index] = *adc1_pbuffer;
-    adc1_pbuffer++;
-    index += 2;
-  }
-
-  index = UART_BUF_SIZE;
-
-  // Serial.println(abdma1.interruptDeltaTime());
-
-  abdma1.clearInterrupt();
-  abdma2.clearInterrupt();
-
-  // send data
-  if (!send)
-  {
-    // clear flags
-    Serial.flush();
-    return;
-  }
-
-  for (size_t i = 0; i < index; i++)
-  {
-    Serial.write(uart_send_buffer[i] & 0xff);
-    Serial.write(uart_send_buffer[i] >> 8 & 0xff);
-    if (i % 64 == 0)
-    {
-      Serial.send_now();
-      Serial.flush();
-    }
-  }
-  Serial.send_now();
-  Serial.flush();
 }

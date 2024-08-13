@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # controls the pinnaes using SPI connection to the grandcentral controllers
 # author: Mason Lopez
 import numpy as np
@@ -14,7 +16,7 @@ try:
     from spidev import SpiDev
 except ImportError:
     logging.error("pinnae.py:: no spidev found, developing on different os ")
-    from fake_spidev import fake_SpiDev as SpiDev
+    from batbot7_bringup.serial.fake_spidev import fake_SpiDev as SpiDev
 
 # global variables holding number of motors in A ear
 NUM_PINNAE_MOTORS = 7
@@ -950,6 +952,6 @@ class PinnaWidget(QWidget):
 
 if __name__ == "__main__":
     app = QApplication([])
-    widget = PinnaWidget(PinnaeController(SpiDev(0,0)),PinnaeController(SpiDev(0,0)))
+    widget = PinnaWidget(PinnaeController(Serial("/dev/ttyACM0")),PinnaeController(SpiDev(0,0)))
     widget.show()
     sys.exit(app.exec())

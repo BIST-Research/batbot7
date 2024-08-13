@@ -1,0 +1,11 @@
+ffmpeg
+libsm6
+libxext6
+libxcb-xinerama0
+python3-pip
+libegl1
+libxcb-cursor-dev
+libxkbcommon-x11-dev
+libxcb-util-dev
+libxcb-icccm4
+libxcb-keysyms1-dev

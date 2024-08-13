@@ -12,3 +12,6 @@ pynmeagps
 pyrtcm
 pyubx2
 paho-mqtt
+PyQt6
+qdarkstyle
+pyqtgraph

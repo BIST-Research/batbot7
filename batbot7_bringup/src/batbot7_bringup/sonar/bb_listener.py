@@ -29,7 +29,7 @@ class t_colors:
     
 class EchoRecorder:
     
-    def __init__(self,serial_obj:Serial = Serial(),channel_burst_len:np.uint16 = 1000, left_channel_first = True,sample_freq:int = 1e6) -> None:
+    def __init__(self, serial_obj:Serial = Serial(), channel_burst_len:np.uint16 = 1000, left_channel_first = True,sample_freq:int = 1e6) -> None:
         """Create echo listener using the serial device 
 
         Args:
