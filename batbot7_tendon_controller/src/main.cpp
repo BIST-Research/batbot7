@@ -1,13 +1,14 @@
 #include <Arduino.h>
-#include <ml_tcc_common.h>
-#include <ml_eic.h>
-#include <tendon/ml_encoder.hpp>
-#include <ml_clocks.h>
-#include <tendon/TendonMotor.h>
-#include <ml_dmac.h>
-#include <ml_spi_common.h>
-#include <ml_sercom_1.h>
+#include <tcc/ml_tcc_common.h>
+#include <eic/ml_eic.h>
+#include <clocks/ml_clocks.h>
+#include <dmac/ml_dmac.h>
+#include <sercom/ml_spi_common.h>
+#include <sercom/ml_sercom_1.h>
 #include <stdbool.h>
+
+#include <TendonMotor.h>
+#include <ml_encoder.hpp>
 
 /// @brief  SPI STUFF
 static DmacDescriptor base_descriptor[3] __attribute__((aligned(16)));

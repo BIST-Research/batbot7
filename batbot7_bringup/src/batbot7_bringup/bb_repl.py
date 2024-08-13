@@ -21,7 +21,7 @@ from cmd2 import (
 
 )
 import sys
-import pinnae
+import batbot7_bringup.pinnae as pinnae
 import numpy as np
 import bb_listener
 import bb_emitter

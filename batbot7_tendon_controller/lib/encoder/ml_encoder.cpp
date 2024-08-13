@@ -3,7 +3,7 @@
  * Date created: 7/31/23
  */
 
-#include <tendon/ml_encoder.hpp>
+#include <ml_encoder.hpp>
 
 void encoder_extint_init(void)
 {

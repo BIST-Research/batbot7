@@ -9,7 +9,7 @@ import matplotlib.colors as colors
 import numpy as np
 from scipy import signal
 
-import bb_listener
+from batbot7_bringup.sonar.bb_listener import EchoRecorder
 
 Fs = 1E6
 Ts = 1/Fs
@@ -236,7 +236,7 @@ def split_raw_to_LR(
 # teensy.close()
 
 CHAN_BURST = 1000
-bb_ears = bb_listener.EchoRecorder(
+bb_ears = EchoRecorder(
     Serial("/dev/ttyACM0"), channel_burst_len=CHAN_BURST
 )
 

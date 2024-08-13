@@ -4,7 +4,7 @@
  */
 
 #include <Arduino.h>
-#include <tendon/ml_motor.hpp>
+#include <ml_motor.hpp>
 
 /*
  * M0:

@@ -3,7 +3,7 @@
  * Date created: 7/29/23
  */
 
-#include <tendon/ml_motor.hpp>
+#include <ml_motor.hpp>
 
 void motor_set_speed(ml_motor *motor, uint16_t speed)
 {
