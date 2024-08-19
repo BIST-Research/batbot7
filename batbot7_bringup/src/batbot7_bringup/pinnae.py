@@ -261,6 +261,7 @@ class PinnaeController:
                 self.com_type = COM_TYPE.NONE
         elif self.com_type == COM_TYPE.UART:
             if self.serial and self.serial.is_open:
+                logging.error("Writing data to serial!")
                 self.serial.write(data_buffer)
             else:
                 logging.error("UART NOT CONNECTED!")

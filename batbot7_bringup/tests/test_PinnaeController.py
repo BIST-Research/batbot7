@@ -11,7 +11,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # sys.path.insert("../")
-from pinnae import PinnaeController, NUM_PINNAE_MOTORS
+from batbot7_bringup.src.batbot7_bringup.pinnae import PinnaeController, NUM_PINNAE_MOTORS
 
 
 
