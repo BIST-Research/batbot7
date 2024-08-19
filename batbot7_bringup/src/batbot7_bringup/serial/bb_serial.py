@@ -51,3 +51,6 @@ class BB_Serial():
 
     def closePort(self):
         lib.closePort(self.serObj)
+
+    def __del__(self):
+        self.closePort()
