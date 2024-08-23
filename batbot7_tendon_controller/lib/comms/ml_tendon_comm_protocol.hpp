@@ -88,12 +88,14 @@ typedef enum {
  * This struct defines the data packets defined by the tendon control communication protocol
  * The structure of a packet is as follows:
  * 
- * [ HEADER 1 ][ HEADER 2 ][ LENGTH ][ OPCODE ][ PARAMS ][ CRC HIGH ][ CRC LOW ]
+ * [ HEADER 1 ][ HEADER 2 ][ LENGTH ][ MOTOR ID ][ OPCODE ][ PARAMS ][ CRC HIGH ][ CRC LOW ]
  * 
- * HEADER 1+2: Used as a packet delimiter to signifify the start of a new packet
+ * HEADER 1+2: Used as a packet delimiter to signifify the start of a new packet. Always the bytes 0xFF 0x00.
  * LENGTH: 8-bit integer used to specify the length of the packet. The header and length fields
  *          are not taken into account when calculating length, so the length is calculated as
  *          4 + number of params (4 comes from opcode, params, and both CRC fields).
+ * MOTOR ID: The id of the motor to read/write. Motors are assumed to be 1 indexed, so 0x00
+ *            is used to read/write all motors.
  * OPCODE: 8-bit integer used to command the tendon controller to perform a certain action
  *          (e.g. read/write angles, write PID, etc.)
  * PARAMS: An array of 8-bit integers. Used as the "arguments" for the opcode.
@@ -120,6 +122,18 @@ typedef struct
     } data_packet_s;
   } data_packet_u;
 } TendonControl_data_packet_s;
+
+typedef struct
+{
+  union 
+  {
+    TendonControl_data_packet_s rx_packet;
+    TendonControl_data_packet_s tx_packet;
+  };
+
+  tendon_comm_result_t comm_result;
+
+} TendonControl_packet_handler_t;
 
 /**
  * @brief Function used to obtain 116-bit CRC

@@ -249,6 +249,10 @@ void uart_controlled()
   //   target_motor_angles[7] = int16_t(serial_buf[15] << 8 | serial_buf[16]);
   // }
 
+  tendon_comm_result_t comm_result = COMM_FAIL;
+
+  // tx comm failure
+
   if (Serial.available())
   {
     char outbuff[100];
@@ -261,8 +265,6 @@ void uart_controlled()
                                     TENDON_CONTROL_PKT_NUM_LEN_BYTES + \
                                     rx_packet->data_packet_u.data_packet_s.len;
 
-    // uint16_t crc = ((uint16_t)rx_packet->data_packet_u.data_packet[total_packet_length - 2] << 8) |
-    //   ((uint16_t)rx_packet->data_packet_u.data_packet[total_packet_length - 1]);
     uint16_t crc = TENDON_CONTROL_MAKE_16B_WORD(
       rx_packet->data_packet_u.data_packet[total_packet_length - 2], 
       rx_packet->data_packet_u.data_packet[total_packet_length - 1]
@@ -272,27 +274,31 @@ void uart_controlled()
 
     if (new_crc != crc)
     {
-      sprintf(outbuff, "Error: CRC mismatch %d, %x =/= %x", total_packet_length, new_crc, crc);
+      // sprintf(outbuff, "Error: CRC mismatch %d, %x =/= %x", total_packet_length, new_crc, crc);
+      comm_result = COMM_CRC_ERROR;
     } else {
+      comm_result = COMM_SUCCESS;
+
       switch (rx_packet->data_packet_u.data_packet_s.opcode)
       {
         case READ_STATUS:
-          sprintf(outbuff, "Reading motor %d status...", rx_packet->data_packet_u.data_packet_s.motorId);
+          // sprintf(outbuff, "Reading motor %d status...", rx_packet->data_packet_u.data_packet_s.motorId);
           break;
         case READ_ANGLE:
-          sprintf(outbuff, "Reading motor %d angle...", rx_packet->data_packet_u.data_packet_s.motorId);
+          // sprintf(outbuff, "Reading motor %d angle...", rx_packet->data_packet_u.data_packet_s.motorId);
           break;
         case WRITE_ANGLE:
         {
           uint8_t len = rx_packet->data_packet_u.data_packet_s.len - 4;
           if (len != 2) {
-            sprintf(outbuff, "Argument error: write angle opcode must have 2 arguments!");
+            // sprintf(outbuff, "Argument error: write angle opcode must have 2 arguments!");
+            comm_result = COMM_PARAM_ERROR;
           } else {
             int16_t angle = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
               rx_packet->data_packet_u.data_packet_s.pkt_params[0],
               rx_packet->data_packet_u.data_packet_s.pkt_params[1]
             );            
-            sprintf(outbuff, "Writing motor %d angle to %d degrees", rx_packet->data_packet_u.data_packet_s.motorId, angle);
+            // sprintf(outbuff, "Writing motor %d angle to %d degrees", rx_packet->data_packet_u.data_packet_s.motorId, angle);
           }
           break;
         }
@@ -300,7 +306,8 @@ void uart_controlled()
         {
           uint8_t len = rx_packet->data_packet_u.data_packet_s.len - 4;
           if (len != 6) {
-            sprintf(outbuff, "Argument error: write pid opcode must have 6 arguments!");
+            // sprintf(outbuff, "Argument error: write pid opcode must have 6 arguments!");
+            comm_result = COMM_PARAM_ERROR;
           } else {
             int16_t P = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
               rx_packet->data_packet_u.data_packet_s.pkt_params[0],
@@ -314,19 +321,32 @@ void uart_controlled()
               rx_packet->data_packet_u.data_packet_s.pkt_params[4],
               rx_packet->data_packet_u.data_packet_s.pkt_params[5]
             ); 
-            sprintf(outbuff, "Writing motor %d pid: %d, %d, %d", rx_packet->data_packet_u.data_packet_s.motorId, P, I, D);
+            // sprintf(outbuff, "Writing motor %d pid: %d, %d, %d", rx_packet->data_packet_u.data_packet_s.motorId, P, I, D);
           }
           break;
         }
         default:
-          // tendon_datapacket_ptr.communicationResult = COMM_INSTRUCTION_ERROR;
-          sprintf(outbuff, "Invalid instruction");
+          comm_result = COMM_INSTRUCTION_ERROR;
+          // sprintf(outbuff, "Invalid instruction");
           break;
       }
     }
 
-    Serial.write(outbuff);
-    Serial.flush(); 
+    TendonControl_data_packet_s tx_packet;
+    tx_packet.data_packet_u.data_packet_s.header[0] = 0xFF;
+    tx_packet.data_packet_u.data_packet_s.header[1] = 0x00;
+    tx_packet.data_packet_u.data_packet_s.len = 1 + TENDON_CONTROL_PKT_NUM_CRC_BYTES + TENDON_CONTROL_PKT_NUM_ID_BYTES + TENDON_CONTROL_PKT_NUM_OPCODE_BYTES;
+    tx_packet.data_packet_u.data_packet_s.motorId = rx_packet->data_packet_u.data_packet_s.motorId; 
+    tx_packet.data_packet_u.data_packet_s.opcode = (uint8_t)READ_STATUS;
+    tx_packet.data_packet_u.data_packet_s.pkt_params[0] = (uint8_t)comm_result;
+
+    uint16_t rx_crc = updateCRC(0, tx_packet.data_packet_u.data_packet, 6);
+    tx_packet.data_packet_u.data_packet_s.pkt_params[1] = rx_crc >> 8;
+    tx_packet.data_packet_u.data_packet_s.pkt_params[2] = rx_crc & 0xFF;
+
+    Serial.write(tx_packet.data_packet_u.data_packet, 8);
+    // Serial.write(outbuff);
+    Serial.flush();
   }
 }
 const ml_pin_settings test_pin = {PORT_GRP_C, 6, PF_A, PP_EVEN, OUTPUT_PULL_UP, DRIVE_OFF};

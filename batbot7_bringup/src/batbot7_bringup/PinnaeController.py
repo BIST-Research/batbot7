@@ -1,22 +1,26 @@
-#!/usr/bin/env python
-
-# controls the pinnaes using SPI connection to the grandcentral controllers
-# author: Mason Lopez
 import numpy as np
+from serial import Serial
 
 import logging
 logging.basicConfig(level=logging.DEBUG)
-import argparse
-from serial import Serial
 from enum import Enum
 
+import time
+
 # for developing on not the PI we create fake library
-# that mimics spidev
+# that mimics spidepc 
 try:
     from spidev import SpiDev
 except ImportError:
     logging.error("pinnae.py:: no spidev found, developing on different os ")
     from batbot7_bringup.serial.fake_spidev import fake_SpiDev as SpiDev
+
+import platform
+
+# if platform.system() == "Linux" or platform.system() == "Darwin":
+from batbot7_bringup.serial.bb_serial import BB_Serial as Serial
+# else:
+    # from serial import Serial
 
 # global variables holding number of motors in A ear
 NUM_PINNAE_MOTORS = 7
@@ -30,6 +34,70 @@ class COM_TYPE(Enum):
     SPI = 0
     FAKE_SPI = 1
     UART = 2
+
+class MOTOR_COMMAND(Enum):
+    READ_STATUS = 0
+    READ_ANGLE = 1
+    WRITE_ANGLE = 2
+    WRITE_PID = 3
+
+class COMM_RESULT(Enum):
+    COMM_SUCCESS = 0
+    COMM_FAIL = 1
+    COMM_INSTRUCTION_ERROR = 2
+    COMM_CRC_ERROR = 3
+    COMM_ID_ERROR = 4
+    COMM_PARAM_ERROR = 5
+
+def crc16(data: bytes):
+    '''
+    CRC-16 (CCITT) implemented with a precomputed lookup table
+    '''
+    table = [ 0x0000,
+        0x8005, 0x800F, 0x000A, 0x801B, 0x001E, 0x0014, 0x8011,
+        0x8033, 0x0036, 0x003C, 0x8039, 0x0028, 0x802D, 0x8027,
+        0x0022, 0x8063, 0x0066, 0x006C, 0x8069, 0x0078, 0x807D,
+        0x8077, 0x0072, 0x0050, 0x8055, 0x805F, 0x005A, 0x804B,
+        0x004E, 0x0044, 0x8041, 0x80C3, 0x00C6, 0x00CC, 0x80C9,
+        0x00D8, 0x80DD, 0x80D7, 0x00D2, 0x00F0, 0x80F5, 0x80FF,
+        0x00FA, 0x80EB, 0x00EE, 0x00E4, 0x80E1, 0x00A0, 0x80A5,
+        0x80AF, 0x00AA, 0x80BB, 0x00BE, 0x00B4, 0x80B1, 0x8093,
+        0x0096, 0x009C, 0x8099, 0x0088, 0x808D, 0x8087, 0x0082,
+        0x8183, 0x0186, 0x018C, 0x8189, 0x0198, 0x819D, 0x8197,
+        0x0192, 0x01B0, 0x81B5, 0x81BF, 0x01BA, 0x81AB, 0x01AE,
+        0x01A4, 0x81A1, 0x01E0, 0x81E5, 0x81EF, 0x01EA, 0x81FB,
+        0x01FE, 0x01F4, 0x81F1, 0x81D3, 0x01D6, 0x01DC, 0x81D9,
+        0x01C8, 0x81CD, 0x81C7, 0x01C2, 0x0140, 0x8145, 0x814F,
+        0x014A, 0x815B, 0x015E, 0x0154, 0x8151, 0x8173, 0x0176,
+        0x017C, 0x8179, 0x0168, 0x816D, 0x8167, 0x0162, 0x8123,
+        0x0126, 0x012C, 0x8129, 0x0138, 0x813D, 0x8137, 0x0132,
+        0x0110, 0x8115, 0x811F, 0x011A, 0x810B, 0x010E, 0x0104,
+        0x8101, 0x8303, 0x0306, 0x030C, 0x8309, 0x0318, 0x831D,
+        0x8317, 0x0312, 0x0330, 0x8335, 0x833F, 0x033A, 0x832B,
+        0x032E, 0x0324, 0x8321, 0x0360, 0x8365, 0x836F, 0x036A,
+        0x837B, 0x037E, 0x0374, 0x8371, 0x8353, 0x0356, 0x035C,
+        0x8359, 0x0348, 0x834D, 0x8347, 0x0342, 0x03C0, 0x83C5,
+        0x83CF, 0x03CA, 0x83DB, 0x03DE, 0x03D4, 0x83D1, 0x83F3,
+        0x03F6, 0x03FC, 0x83F9, 0x03E8, 0x83ED, 0x83E7, 0x03E2,
+        0x83A3, 0x03A6, 0x03AC, 0x83A9, 0x03B8, 0x83BD, 0x83B7,
+        0x03B2, 0x0390, 0x8395, 0x839F, 0x039A, 0x838B, 0x038E,
+        0x0384, 0x8381, 0x0280, 0x8285, 0x828F, 0x028A, 0x829B,
+        0x029E, 0x0294, 0x8291, 0x82B3, 0x02B6, 0x02BC, 0x82B9,
+        0x02A8, 0x82AD, 0x82A7, 0x02A2, 0x82E3, 0x02E6, 0x02EC,
+        0x82E9, 0x02F8, 0x82FD, 0x82F7, 0x02F2, 0x02D0, 0x82D5,
+        0x82DF, 0x02DA, 0x82CB, 0x02CE, 0x02C4, 0x82C1, 0x8243,
+        0x0246, 0x024C, 0x8249, 0x0258, 0x825D, 0x8257, 0x0252,
+        0x0270, 0x8275, 0x827F, 0x027A, 0x826B, 0x026E, 0x0264,
+        0x8261, 0x0220, 0x8225, 0x822F, 0x022A, 0x823B, 0x023E,
+        0x0234, 0x8231, 0x8213, 0x0216, 0x021C, 0x8219, 0x0208,
+        0x820D, 0x8207, 0x0202 
+    ]
+    
+    crc = 0x0000
+    for byte in data:
+        crc = (crc << 8) ^ table[(crc >> 8) ^ byte & 0xFF]
+        crc &= 0xFFFF                                   # important, crc must stay 16bits all the way through
+    return crc
 
 class PinnaeController:
     def __init__(self,spiObj:SpiDev = None,serial_dev:Serial = None) -> None:
@@ -45,8 +113,9 @@ class PinnaeController:
         self.max_angle_limits[:] = DEFAULT_MAX_ANGLE_LIMIT
         
         self.com_type = COM_TYPE.NONE
-        
 
+        # serial_dev.set_attributes(115200, 1)
+        # serial_dev.enable_blocking(True)
 
         self.spi = spiObj
         self.serial = serial_dev
@@ -58,6 +127,8 @@ class PinnaeController:
             self.spi.max_speed_hz = 10000000
             logging.debug("Using SPI object")
         elif serial_dev != None:
+            self.serial.set_attributes(115200, 1)
+            self.serial.enable_blocking(True)
             self.com_type = COM_TYPE.UART
             logging.debug("Using Serial object")
         else:
@@ -149,8 +220,9 @@ class PinnaeController:
                 logging.error("SPI NOT CONNECTED!")
                 self.com_type = COM_TYPE.NONE
         elif self.com_type == COM_TYPE.UART:
-            if self.serial and self.serial.is_open:
-                self.serial.write(data_buffer)
+            if self.serial:
+                logging.debug(f'Resetting zero position of motor {index}')
+                # self.serial.write(data_buffer)
             else:
                 logging.error("UART NOT CONNECTED!")
                 self.com_type == COM_TYPE.NONE
@@ -202,8 +274,9 @@ class PinnaeController:
                 logging.error("SPI NOT CONNECTED!")
                 self.com_type = COM_TYPE.NONE
         elif self.com_type == COM_TYPE.UART:
-            if self.serial and self.serial.is_open:
-                self.serial.write(data_buffer)
+            if self.serial:
+                logging.debug(f"Moving to min motor {index}")
+                # self.serial.write(data_buffer)
             else:
                 logging.error("UART NOT CONNECTED!")
                 self.com_type == COM_TYPE.NONE
@@ -260,9 +333,9 @@ class PinnaeController:
                 logging.error("SPI NOT CONNECTED!")
                 self.com_type = COM_TYPE.NONE
         elif self.com_type == COM_TYPE.UART:
-            if self.serial and self.serial.is_open:
-                logging.error("Writing data to serial!")
-                self.serial.write(data_buffer)
+            if self.serial:
+                logging.debug("Writing data to serial!")
+                # self.serial.write(data_buffer)
             else:
                 logging.error("UART NOT CONNECTED!")
                 self.com_type == COM_TYPE.NONE
@@ -392,8 +465,10 @@ class PinnaeController:
             return False
         
         # set the angle
-        self.current_angles[motor_index] = angle
-        self.send_MCU_angles()
+        angle_h = np.uint8((angle >> 8) & 0xff)
+        angle_l = np.uint8(angle & 0xff)
+
+        self.send_motor_command(motor_index, MOTOR_COMMAND.WRITE_ANGLE, [angle_h, angle_l])
         return True
 
 
@@ -449,8 +524,7 @@ class PinnaeController:
     # set motors to max angle
     def set_motor_to_max(self,motor_index:np.uint8)->None:
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
-        self.current_angles[motor_index] = self.max_angle_limits[motor_index]
-        self.send_MCU_angles()
+        self.set_motor_angle(motor_index, self.max_angle_limits[motor_index])
         logging.debug(f"Setting motor: {motor_index} to max value")
 
 
@@ -464,8 +538,7 @@ class PinnaeController:
     # set motors to min angle
     def set_motor_to_min(self,motor_index:np.uint8)->None:
         assert motor_index < NUM_PINNAE_MOTORS, f"Motor index: {motor_index} exceded maximum index{NUM_PINNAE_MOTORS}"
-        self.current_angles[motor_index] = self.min_angle_limits[motor_index]
-        self.send_MCU_angles()
+        self.set_motor_angle(motor_index, self.min_angle_limits[motor_index])
         logging.debug(f"Setting motor: {motor_index} to min")
 
 
@@ -483,8 +556,7 @@ class PinnaeController:
             logging.debug(f"Failed to set motor: {motor_index} to zero")
             return False
     
-        self.current_angles[motor_index] = 0
-        self.send_MCU_angles()
+        self.set_motor_angle(motor_index, 0)
         logging.debug(f"Success setting motor: {motor_index} to zero")
         
         return True
@@ -500,6 +572,42 @@ class PinnaeController:
         logging.debug("Setting all motors to zero")
         return True
     
+    def send_motor_command(self, index:np.uint8, command:MOTOR_COMMAND, params:list[np.uint8])->bool:
+
+        start = time.time()
+        data = [0xFF, 0x00]
+        data.append(4 + len(params))
+        data.append(index)
+        data.append(command.value)
+        data = data + params
+        crc = crc16(data)
+        data.append(crc >> 8)
+        data.append(crc & 0xFF)
+        print("".join('{:02x} '.format(x) for x in data))
+
+        end = time.time()
+        elapsed_time_ms = 1000* (end - start)
+        logging.debug(f'Took {elapsed_time_ms} to construct packet')
+
+        start = time.time()
+        self.serial.writeBytes(data, len(data))
+        end = time.time()
+        elapsed_time_ms = 1000 * (end - start)
+        logging.debug(f'Took {elapsed_time_ms} to send data')
+
+        start = time.time()
+        n, buff = self.serial.readBytes(16)
+        end = time.time()
+        elapsed_time_ms = 1000 * (end - start)
+        logging.debug(f'Took {elapsed_time_ms} to read data')
+
+        # print("".join('{:02x} '.format(x) for x in buff))
+        # print("".join(map(chr, buff)))
+
+        if (buff[5] == COMM_RESULT.COMM_SUCCESS.value):
+            logging.debug('Successfully processed motor command')
+        else:
+            logging.error('Error with motor command')
 
     # --------------------------------------------------------------------------------------
     #           Functions for moving the motors
@@ -531,428 +639,3 @@ class PinnaeController:
             times (int, optional): _description_. Defaults to 1.
         """
         pass
-
-from PyQt6.QtWidgets import (
-    QApplication,
-    QWidget,
-    QGroupBox,
-    QLabel,
-    QHBoxLayout,
-    QVBoxLayout,
-    QPushButton,
-    QComboBox,
-    QSlider,
-    QLineEdit,
-    QSpinBox,
-    QGridLayout,
-    QErrorMessage,
-    QMenu,
-    QTableWidget,
-    QFileDialog
-)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon
-import sys
-import qdarkstyle
-
-
-class PinnaWidget(QWidget):
-    main_v_layout = QVBoxLayout()
-
-    def __init__(self,l_pinna:PinnaeController, r_pinna:PinnaeController):
-        QWidget.__init__(self)
-        
-        self.pinnae = l_pinna
-        
-        self.setWindowTitle("Tendon Controller")
-        self.setWindowIcon(QIcon('HBAT.jpg'))
-        self.add_settings_box()
-        self.add_motor_controls()
-        self.add_table()
-        self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt6())
-        
-        self.setLayout(self.main_v_layout)
-
-    def add_settings_box(self):
-        grid_lay = QGridLayout()
-
-        self.read_limits_PB = QPushButton("Query Limits")
-        grid_lay.addWidget(self.read_limits_PB,0,0)
-
-        self.calibrate_limits = QPushButton("Calibrate Motors")
-        grid_lay.addWidget(self.calibrate_limits,1,0)
-
-        self.load_file = QPushButton("Load File")
-        self.load_file.clicked.connect(self.load_file_CB)
-        grid_lay.addWidget(self.load_file,0,1)
-
-        self.create_file = QPushButton("Create File")
-        self.create_file.clicked.connect(self.create_file_CB)
-        grid_lay.addWidget(self.create_file,1,1)
-
-        # grid_lay.addWidget(QLabel("Motion File:"),0,2)
-        # self.file_name = QLineEdit()
-        # grid_lay.addWidget(self.file_name,0,3)
-
-
-        self.main_v_layout.addLayout(grid_lay)
-        
-    def load_file_CB(self):
-        file_path,_ = QFileDialog.getOpenFileName(self,'Load File')
-        
-    def create_file_CB(self):
-        file_path, _ = QFileDialog.getSaveFileName(self,'Save File')
-
-
-    def add_motor_controls(self):
- 
-        
-        control_h_lay = QHBoxLayout()
-        
-        self.motor_GB = [
-            QGroupBox("Motor 1"),
-            QGroupBox("Motor 2"),
-            QGroupBox("Motor 3"),
-            QGroupBox("Motor 4"),
-            QGroupBox("Motor 5"),
-            QGroupBox("Motor 6"),
-            QGroupBox("Motor 7")
-        ]
-
-        self.motor_max_PB = [
-            QPushButton("Max"),
-            QPushButton("Max"),
-            QPushButton("Max"),
-            QPushButton("Max"),
-            QPushButton("Max"),
-            QPushButton("Max"),
-            QPushButton("Max"),
-        ]
-        
-        self.motor_min_PB = [
-            QPushButton("Min"),
-            QPushButton("Min"),
-            QPushButton("Min"),
-            QPushButton("Min"),
-            QPushButton("Min"),
-            QPushButton("Min"),
-            QPushButton("Min"),
-        ]
-
-        self.motor_max_limit_SB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox()
-        ]
-
-        self.motor_min_limit_SB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox()
-        ]
-
-        self.motor_value_SB = [
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox(),
-            QSpinBox()
-        ]
-        
-        self.motor_value_SLIDER = [
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-            QSlider(Qt.Orientation.Vertical),
-        ]
-        
-        self.motor_set_zero_PB = [
-            QPushButton("Set Zero"),
-            QPushButton("Set Zero"),
-            QPushButton("Set Zero"),
-            QPushButton("Set Zero"),
-            QPushButton("Set Zero"),
-            QPushButton("Set Zero"),
-            QPushButton("Set Zero")
-        ]
-        
-        # number_motors = 6
-        max_value = 10000
-        
-        for index in range(NUM_PINNAE_MOTORS):
-            vertical_layout = QVBoxLayout()
-            
-            temp_CB = QGroupBox("Control")
-            
-            # 4 row by 2 columns
-            grid_lay = QGridLayout()
-            
-            # add max button
-            grid_lay.addWidget(self.motor_max_PB[index],0,0)
-            
-            # add max spinbox
-            self.motor_max_limit_SB[index].setRange(-max_value,max_value)
-            self.motor_max_limit_SB[index].setValue(180)
-            grid_lay.addWidget(self.motor_max_limit_SB[index],0,1)
-            
-            # add value spinbox
-            self.motor_value_SB[index].setRange(-max_value,max_value)
-            grid_lay.addWidget(self.motor_value_SB[index],1,0)
-            
-            # add value slider
-            self.motor_value_SLIDER[index].setMinimumHeight(100)
-            self.motor_value_SLIDER[index].setRange(-max_value,max_value)
-            self.motor_value_SLIDER[index].setValue(0)
-            grid_lay.addWidget(self.motor_value_SLIDER[index],1,1)
-            
-            # add min button
-            grid_lay.addWidget(self.motor_min_PB[index],2,0)
-            
-            # add min spinbox
-            self.motor_min_limit_SB[index].setRange(-max_value,max_value)
-            self.motor_min_limit_SB[index].setValue(-180)
-            grid_lay.addWidget(self.motor_min_limit_SB[index],2,1)
-            
-            ## add the layout
-            vertical_layout.addLayout(grid_lay)
-            
-            # add set zero
-            # vertical_layout.addWidget(self.motor_set_zero_PB[index])
-        
-            # set max width
-            self.motor_GB[index].setMaximumWidth(160)
-            
-            # attach custom context menu
-            self.motor_GB[index].setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-            self.motor_GB[index].customContextMenuRequested.connect(lambda pos,i = index: self.motor_GB_contextMenu(pos,i))
-            
-            self.motor_GB[index].setLayout(vertical_layout)
-            control_h_lay.addWidget(self.motor_GB[index])
-        
-        self.main_v_layout.addLayout(control_h_lay)
-        
-        # attach callbacks for controller tendon api
-        self.add_motor_control_CB()
-
-    def add_table(self):
-        hlay = QHBoxLayout()
-        self.instruction_T = QTableWidget(1,NUM_PINNAE_MOTORS+1)
-        hlay.addWidget(self.instruction_T)
-        self.instruction_T.setHorizontalHeaderLabels(["M1","M2","M3","M4","M5","M6","M7","Time"])
-        
-        #-------------------------------------------------
-        buttonGB = QGroupBox("Settings")
-        vlay = QVBoxLayout()
-
-        self.run_angles_PB = QPushButton("Run")
-        vlay.addWidget(self.run_angles_PB)
-
-        self.step_back_PB = QPushButton("Step Backward")
-        vlay.addWidget(self.step_back_PB)
-
-        self.step_forward_PB = QPushButton("Step Forward")
-        vlay.addWidget(self.step_forward_PB)
-
-        self.new_row_PB = QPushButton("+ Row")
-        vlay.addWidget(self.new_row_PB)
-
-        self.delete_row_PB = QPushButton("- Row")
-        vlay.addWidget(self.delete_row_PB)
-
-        self.paste_angles_PB = QPushButton("Paste Current Angles")
-        vlay.addWidget(self.paste_angles_PB)
-
-
-        buttonGB.setLayout(vlay)
-        #-------------------------------------------------
-        hlay.addWidget(buttonGB)
-
-        self.main_v_layout.addLayout(hlay)
-        
-    def add_motor_control_CB(self):
-        """Connects the motor tendons sliders to the api"""
-        
-        # attach max buttons
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_max_PB[i].pressed.connect(lambda index=i: self.motor_max_PB_pressed(index))
-        
-        # attach max limit spinbox
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_max_limit_SB[i].editingFinished.connect(lambda index=i: self.motor_max_limit_changed_CB(index))
-
-            
-        # attach min buttons
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_min_PB[i].pressed.connect(lambda index=i: self.motor_min_PB_pressed(index))
-
-        # attach min limit spinbox
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_min_limit_SB[i].editingFinished.connect(lambda index=i: self.motor_min_limit_changed_CB(index))
-            
-            
-        # attach set to zero buttons
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_set_zero_PB[i].pressed.connect(lambda index=i: self.motor_set_zero_PB_callback(index))
-
-        # attach sliders
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_value_SLIDER[i].valueChanged.connect(lambda value, index=i: self.motor_value_SLIDER_valueChanged(index))
-        
-        # attach spinbox
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_value_SB[i].editingFinished.connect(lambda index=i: self.motor_value_SB_valueChanged(index))
-            
-        # adjust the slider and spinbox range
-        for i in range(NUM_PINNAE_MOTORS):
-            self.motor_max_limit_changed_CB(i)
-
-
-    def motor_GB_contextMenu(self,position,index) -> None:
-        """Create menu for each motor box to reduce the number of buttons
-
-        Args:
-            position (int): passed from qt, position on context menu
-            index (int): which motor box this is coming from
-        """
-        assert index < NUM_PINNAE_MOTORS, f"{index} is greater than number of pinnaes!"
-        context_menu = QMenu()
-        context_menu.addMenu(f"Motor {index+1}:")
-        
-        set_zero = context_menu.addAction("Set Zero")
-        max_value = context_menu.addAction("Max")
-        min_value = context_menu.addAction("Min")
-        calibrate = context_menu.addAction("Calibrate Zero")
-        
-        action = context_menu.exec(self.motor_GB[index].mapToGlobal(position))
-        
-        if action == set_zero:
-            self.motor_set_zero_PB_callback(index)
-        elif action == max_value:
-            self.motor_max_PB_pressed(index)
-        elif action == min_value:
-            self.motor_min_PB_pressed(index)
-        elif action == calibrate:
-            pass
-
-        
-    def motor_max_PB_pressed(self,index):
-        """Sets the current motor to its max value
-
-        Args:
-            index (_type_): index of motor 
-        """
-        self.pinnae.set_motor_to_max(index)
-        self.motor_value_SB[index].setValue(self.motor_max_limit_SB[index].value())
-        self.motor_value_SLIDER[index].setValue(self.motor_max_limit_SB[index].value())
-        
-        
-    def motor_min_PB_pressed(self,index):
-        """Sets the current motor to its min value
-
-        Args:
-            index (_type_): index of motor
-        """
-        self.pinnae.set_motor_to_min(index)
-        self.motor_value_SB[index].setValue(self.motor_min_limit_SB[index].value())
-        self.motor_value_SLIDER[index].setValue(self.motor_min_limit_SB[index].value())
-        
-        
-    def motor_value_SB_valueChanged(self,index):
-        """Sets the new spin
-
-        Args:
-            index (_type_): index to change
-        """
-        if self.motor_value_SB[index].value() != self.motor_value_SLIDER[index].value():
-            self.motor_value_SLIDER[index].setValue(self.motor_value_SB[index].value())
-            self.pinnae.set_motor_angle(index, self.motor_value_SB[index].value())
-        
-        
-    def motor_value_SLIDER_valueChanged(self,index):
-        """Sets the slider value
-
-        Args:
-            index (_type_): index to change
-        """
-        if self.motor_value_SLIDER[index].value() != self.motor_value_SB[index].value():
-            self.motor_value_SB[index].setValue(self.motor_value_SLIDER[index].value())
-            self.pinnae.set_motor_angle(index,self.motor_value_SLIDER[index].value())
-    
-    
-    def motor_set_zero_PB_callback(self,index):
-        """Callback for when the set new zero push button is set
-
-        Args:
-            index (_type_): changing motor new zero position
-        """
-        self.pinnae.set_new_zero_position(index)
-        [min,max] = self.pinnae.get_motor_limit(index)
-        
-        # adjust the new limits of spinbox
-        self.motor_max_limit_SB[index].setValue(max)
-        self.motor_min_limit_SB[index].setValue(min)
-        
-        # set new values to 0
-        self.motor_value_SB[index].setValue(0)
-        self.motor_value_SLIDER[index].setValue(0)
-        
-        
-    def motor_max_limit_changed_CB(self,index):
-        """callback when limit spinbox is changed
-
-        Args:
-            index (_type_): index of motors
-        """
-        
-        new_value = self.motor_max_limit_SB[index].value()
-        
-        if  self.pinnae.set_motor_max_limit(index,new_value):
-            [min,max] = self.pinnae.get_motor_limit(index)
-            self.motor_value_SLIDER[index].setRange(min,max)
-            self.motor_value_SB[index].setRange(min,max)
-            
-
-
-        else:
-            self.motor_max_limit_SB[index].setValue(self.pinnae.get_motor_max_limit(index))
-            error_msg = QErrorMessage(self)
-            error_msg.showMessage("New max is greater than current angle!")
-
-    def motor_min_limit_changed_CB(self,index):
-        """callback when limit spinbox is changed
-
-        Args:
-            index (_type_): index of motors
-        """
-        
-        new_value = self.motor_min_limit_SB[index].value()
-        
-        if self.pinnae.set_motor_min_limit(index,new_value):
-            [min,max] = self.pinnae.get_motor_limit(index)
-            self.motor_value_SLIDER[index].setRange(min,max)
-            self.motor_value_SB[index].setRange(min,max)
-
-        else:
-            self.motor_min_limit_SB[index].setValue(self.pinnae.get_motor_min_limit(index))
-            error_msg = QErrorMessage(self)
-            error_msg.showMessage("New min is less than current angle!")
-    
-
-if __name__ == "__main__":
-    app = QApplication([])
-    widget = PinnaWidget(PinnaeController(Serial("/dev/ttyACM0")),PinnaeController(SpiDev(0,0)))
-    widget.show()
-    sys.exit(app.exec())

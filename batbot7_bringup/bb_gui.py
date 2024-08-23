@@ -54,7 +54,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 import numpy as np
-from scipy import signal
+import scipy
+import signal
 
 import threading
 from datetime import datetime
@@ -69,6 +70,8 @@ from batbot7_bringup.serial.serial_helper import get_port_from_serial_num
 from batbot7_bringup.pinnae import PinnaeController
 
 matplotlib.set_loglevel("error")
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 # showing plots in qt from matlab
 class MplCanvas(FigureCanvas):
@@ -909,7 +912,7 @@ class BBGUI(QWidget):
         Fs = 1e6
         NFFT = 512
         noverlap = 400
-        spec_settings = (Fs, NFFT, noverlap, signal.windows.hann(NFFT))
+        spec_settings = (Fs, NFFT, noverlap, scipy.signal.windows.hann(NFFT))
         DB_range = 40
         f_plot_bounds = (30e3, 100e3)
 
