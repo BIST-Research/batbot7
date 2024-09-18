@@ -1,5 +1,6 @@
 README.md
 setup.py
+src/batbot7_bringup/PinnaeController.py
 src/batbot7_bringup/TendonControllerSPI-working.py
 src/batbot7_bringup/__init__.py
 src/batbot7_bringup/bb_data.py
@@ -8,13 +9,18 @@ src/batbot7_bringup/bb_log.py
 src/batbot7_bringup/bb_repl.py
 src/batbot7_bringup/bb_utils.py
 src/batbot7_bringup/emit.py
-src/batbot7_bringup/pinnae.py
 src/batbot7_bringup/simple_sonar.py
 src/batbot7_bringup.egg-info/PKG-INFO
 src/batbot7_bringup.egg-info/SOURCES.txt
 src/batbot7_bringup.egg-info/dependency_links.txt
 src/batbot7_bringup.egg-info/top_level.txt
+src/batbot7_bringup/gui/BBGui.py
+src/batbot7_bringup/gui/CollapsibleBox.py
+src/batbot7_bringup/gui/MotorWidget.py
+src/batbot7_bringup/gui/__init__.py
 src/batbot7_bringup/serial/__init__.py
+src/batbot7_bringup/serial/bb_serial.py
+src/batbot7_bringup/serial/bb_serial_test.py
 src/batbot7_bringup/serial/fake_spidev.py
 src/batbot7_bringup/serial/hwdefs.py
 src/batbot7_bringup/serial/ser_utils.py
