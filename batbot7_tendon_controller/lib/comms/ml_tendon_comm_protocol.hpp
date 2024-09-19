@@ -61,6 +61,28 @@
 /**
  * @brief Enum defining opcodes for motor tendon control
  * 
+ * The way to use these commands is as follows:
+ * 
+ * READ_STATUS: Reads the status of a specified motor. If the specified ID is 0xFE, then the request becomes 
+ * a multiple read command. In this case, you must add the motor ids (1 byte) you wish to read from in the parameters.
+ *               
+ * READ_ANGLE: Reads the angle of a specified motor. If the specified ID is 0xFE, then the request becomes 
+ * a multiple read command. In this case, you must add the motor ids (1 byte) you wish to read from in the parameters.
+ * 
+ * WRITE_ANGLE: Writes a goal angle to the motor. If the specified ID is 0xFE, then the request becomes
+ * a multiple write command. In this case, the parameters are:
+ * 
+ * [ MOTOR ID 1 ][ MOTOR ID 1 GOAL ANGLE HIGH BYTES ][ MOTOR ID 2 GOAL ANGLE HIGH BYTES ]
+ * 
+ * For each motor you wish to write.
+ * 
+ * WRITE_ANGLE: Writes a goal angle to the motor. If the specified ID is 0xFE, then the request becomes
+ * a multiple write command. In this case, the parameters are:
+ * 
+ * [ MOTOR ID 1 ][ MOTOR ID 1 GOAL ANGLE HIGH BYTES ][ MOTOR ID 2 GOAL ANGLE HIGH BYTES ]
+ * 
+ * For each motor you wish to write.
+ * 
  */
 typedef enum {
   READ_STATUS,

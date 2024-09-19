@@ -52,31 +52,25 @@ def crc16(data: bytes):
     return crc
 
 
-start = time.time()
 data = [0xFF, 0x00, 0x0A, 0x02, 0x03, 0xFF, 0xFE, 0xFF, 0xFE, 0xFF, 0xFE]
 # data = [0xFF, 0x00, 0x06, 0x02, 0x02, 0xFF, 0xFE]
 crc = crc16(data)
 print(hex(crc))
 data.append(crc >> 8)
 data.append(crc & 0xFF)
-data.append(0x0D)   # carriage return
 print(data)
-end = time.time()
-print(f'Packet construction time: {(end - start) * 1000} ms')
 
 ser = bb_serial.BB_Serial('/dev/ttyACM0')
 ser.set_attributes(115200, 1)
 ser.enable_blocking(True)
 
+N = 500
 start = time.time()
-ser.writeBytes(data, len(data))
+for i in range(0, N):
+    ser.writeBytes(data, len(data))
+    n, buff = ser.readBytes(100)
+    if buff[5] != 0:
+        print('Sent/received an erroneous packet')
+        break
 end = time.time()
-print(f'Packet write time: {(end - start) * 1000} ms')
-
-start = time.time()
-n, buff = ser.readBytes(100)
-end = time.time()
-print(f'Packet read time: {(end - start) * 1000} ms')
-
-print("".join('{:02x} '.format(x) for x in buff))
-# print("".join(map(chr, buff)))
+print(f'Sent {N} packets in {(end - start) * 1000} ms')
