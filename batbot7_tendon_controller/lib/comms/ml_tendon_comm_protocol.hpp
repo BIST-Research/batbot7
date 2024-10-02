@@ -61,27 +61,52 @@
 /**
  * @brief Enum defining opcodes for motor tendon control
  * 
- * The way to use these commands is as follows:
+ * The protocol parses data packets (see the data packet structure) and performs the following functions as follows:
  * 
- * READ_STATUS: Reads the status of a specified motor. If the specified ID is 0xFE, then the request becomes 
- * a multiple read command. In this case, you must add the motor ids (1 byte) you wish to read from in the parameters.
+ * READ_STATUS: Reads the status of the motor specified by motor ID. If motor ID is given to be 0xFF, then READ_STATUS
+ * will perform a multiple read command. In this case you must pass the ID of each motor whose status you want to read.
+ * The order of the IDs does not matter.
+ * 
+ * For instance if you would like to read the status of motors 2, 4, 6, the params would be:
+ * 
+ * [ 0x02 ][ 0x04 ][ 0x06 ]
  *               
- * READ_ANGLE: Reads the angle of a specified motor. If the specified ID is 0xFE, then the request becomes 
- * a multiple read command. In this case, you must add the motor ids (1 byte) you wish to read from in the parameters.
+ * READ_ANGLE: Reads the angle of the motor specified my motor ID. If the specified ID is 0xFF, then READ_ANGLE
+ * will perform a multiple read command. You must pass the ID of each motor whose angle you want to read. The 
+ * order of the IDs does not matter.
+ *  
+ * For instance if you would like to read the angles of motors 2, 4, 6, the params would be:
  * 
- * WRITE_ANGLE: Writes a goal angle to the motor. If the specified ID is 0xFE, then the request becomes
- * a multiple write command. In this case, the parameters are:
+ * [ 0x02 ][ 0x04 ][ 0x06 ]
+ * 
+ * WRITE_ANGLE: Writes a goal angle (signed 16-bit integer) to the motor specifed by motor ID. This function requires 2 parameters in 
+ * the following order:
+ * 
+ * Param 1                  Param 2
+ * [ GOAL ANGLE BYTES HIGH ][ GOAL ANGLE BYTES LOW ]
+ * 
+ * If the specified ID is 0xFE, then the request becomes a multiple write command. You must pass as a parameter the ID of each
+ * motor you want to write immediately followed by the goal angle high and low bytes. The order of motor IDs does not matter,
+ * however, the goal angle high and low bytes must immediately follow their corresponding motor ID.
+ * 
+ * For instance, if you would like to write motor 2 to 0 degrees and motor 4 to 5 degrees, the params would be:
+ * 
+ * Motor ID 1  Goal Angle 1 High   Goal Angle 1 Low    Motor ID 2  Goal Angle 2 High   Goal Angle 2 Low
+ * [   0x02   ][       0x00       ][       0x00       ][   0x04   ][       0x00       ][       0x00       ]
  * 
  * [ MOTOR ID 1 ][ MOTOR ID 1 GOAL ANGLE HIGH BYTES ][ MOTOR ID 2 GOAL ANGLE HIGH BYTES ]
  * 
  * For each motor you wish to write.
  * 
- * WRITE_ANGLE: Writes a goal angle to the motor. If the specified ID is 0xFE, then the request becomes
- * a multiple write command. In this case, the parameters are:
+ * WRITE_PID: Writes the PID parameters (signed 16-bit integers) to the motor specifed by motor ID. This function requires 6 parameters in 
+ * the following order:
  * 
- * [ MOTOR ID 1 ][ MOTOR ID 1 GOAL ANGLE HIGH BYTES ][ MOTOR ID 2 GOAL ANGLE HIGH BYTES ]
+ * [ P BYTES HIGH ][ P BYTES LOW ][ I BYTES HIGH ][ I BYTES LOW ][ D BYTES HIGH ][ D BYTES LOW ]
  * 
- * For each motor you wish to write.
+ * This function does not support multiple write operations.
+ * 
+ * *Note*: Look into the possibility of multiple write operations. Only problem is that the messages can get very long. Need to test if this 
+ * causes any significant input lag.
  * 
  */
 typedef enum {

@@ -64,7 +64,7 @@ ser = bb_serial.BB_Serial('/dev/ttyACM0')
 ser.set_attributes(115200, 1)
 ser.enable_blocking(True)
 
-N = 500
+N = 2000
 start = time.time()
 for i in range(0, N):
     ser.writeBytes(data, len(data))

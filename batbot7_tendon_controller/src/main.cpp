@@ -303,7 +303,10 @@ void uart_controlled()
               int16_t angle = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
                 rx_packet->data_packet_u.data_packet_s.pkt_params[0],
                 rx_packet->data_packet_u.data_packet_s.pkt_params[1]
-              );            
+              );
+
+              tendons[rx_packet->data_packet_u.data_packet_s.motorId].Set_Angle((float)angle);
+              
               // sprintf(outbuff, "Writing motor %d angle to %d degrees", rx_packet->data_packet_u.data_packet_s.motorId, angle);
             }
             break;
