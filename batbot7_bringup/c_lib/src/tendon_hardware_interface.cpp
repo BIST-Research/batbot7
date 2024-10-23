@@ -4,13 +4,18 @@
 
 #include "iostream"
 
+#define COMM_BAUD 115200
+
 TendonHardwareInterface::TendonHardwareInterface(std::string portName) {
     #ifdef __linux__
         ser = new SerialObject_UART_Linux(portName);
+        ((SerialObject_UART_Linux *)ser)->set_attributes(COMM_BAUD, 1);
+        ((SerialObject_UART_Linux *)ser)->enable_blocking(true);
     #endif
 }
 
 TendonHardwareInterface::~TendonHardwareInterface() {
+    ser->closePort();
     delete ser;
 }
 
@@ -83,21 +88,13 @@ void TendonHardwareInterface::BuildPacket(uint8_t id, uint8_t opcode, uint8_t* p
     tx.data_packet_u.data_packet_s.pkt_params[i] = rx_crc >> 8;
     tx.data_packet_u.data_packet_s.pkt_params[i + 1] = rx_crc & 0xFF;
 
-    for (int i = 0; i < tx.data_packet_u.data_packet_s.len + 3; ++i)
-    {
-        std::cout << std::hex << int(tx.data_packet_u.data_packet[i]) << " ";
-    }
-    std::cout << "\n";
-
     return;
 }
 
 void TendonHardwareInterface::SendTxRx()
 {
-    std::cout << "Sending transmission...";
     SendTx();
 
-    std::cout << "Reading transmission...";
     uint8_t buff[TENDON_CONTROL_PKT_MAX_NUM_BYTES_IN_FRAME];
     ser->readBytes(buff, TENDON_CONTROL_PKT_MAX_NUM_BYTES_IN_FRAME);
 }
@@ -105,7 +102,12 @@ void TendonHardwareInterface::SendTxRx()
 void TendonHardwareInterface::SendTx()
 {
     std::size_t total_packet_len = tx.data_packet_u.data_packet_s.len + 3;
-    ser->writeBytes(tx.data_packet_u.data_packet, total_packet_len);
+    for (int i = 0; i < total_packet_len; ++i)
+    {
+        std::cout << std::hex << int(tx.data_packet_u.data_packet[i]) << " ";
+    }
+    std::cout << "\n";
+    ser->writeBytes(tx.data_packet_u.data_packet, total_packet_len - 1);
 }
 
 extern "C"

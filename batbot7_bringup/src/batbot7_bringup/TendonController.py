@@ -37,8 +37,6 @@ class TendonController:
         lib.SendTx.argtypes = [ctypes.c_void_p]
         lib.SendTx.restype = ctypes.c_void_p
 
-        print(port_name.encode('utf-8'))
-
         self.TendonInterface = lib.TendonHardwareInterface_new(port_name.encode('utf-8'))
 
             
@@ -83,4 +81,8 @@ if __name__ == "__main__":
     tc = TendonController(port_name="/dev/ttyACM0")
 
     tc.writeAngle(0, 90)
-    tc.readAngle(0)
+    # tc.readAngle(0)
+
+"""
+BUG: For some reason sending these messages first causes a freeze
+"""
