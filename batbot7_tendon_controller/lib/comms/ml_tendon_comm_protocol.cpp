@@ -51,3 +51,164 @@ uint16_t updateCRC(uint16_t crc_accum, uint8_t *data, uint16_t data_blk_size)
 
   return crc_accum;
 }
+
+void parsePacket(TendonControl_packet_handler_t* pkt_handler, const char* buff)
+{
+  pkt_handler->rx_packet = (TendonControl_data_packet_s *)buff;
+
+  uint16_t total_packet_length = TENDON_CONTROL_PKT_NUM_HEADER_BYTES + \
+                                      TENDON_CONTROL_PKT_NUM_LEN_BYTES + \
+                                      pkt_handler->rx_packet->data_packet_u.data_packet_s.len;
+
+    uint16_t crc = TENDON_CONTROL_MAKE_16B_WORD(
+      pkt_handler->rx_packet->data_packet_u.data_packet[total_packet_length - 2], 
+      pkt_handler->rx_packet->data_packet_u.data_packet[total_packet_length - 1]
+    );
+
+    uint16_t new_crc = updateCRC(0, pkt_handler->rx_packet->data_packet_u.data_packet, total_packet_length - TENDON_CONTROL_PKT_NUM_CRC_BYTES);
+
+    if (new_crc != crc)
+    {
+      pkt_handler->comm_result = COMM_CRC_ERROR;
+    } else {
+      pkt_handler->comm_result = COMM_SUCCESS;
+    }
+}
+
+void buildPacket(TendonControl_packet_handler_t* pkt_handler, tendon_opcode_t opcode, uint8_t id, int numParams)
+{
+  if (pkt_handler->tx_packet == NULL)
+    pkt_handler->tx_packet = new TendonControl_data_packet_s;
+
+  pkt_handler->tx_packet->data_packet_u.data_packet_s.header[0] = 0xFF;
+  pkt_handler->tx_packet->data_packet_u.data_packet_s.header[1] = 0x00;
+  pkt_handler->tx_packet->data_packet_u.data_packet_s.len = numParams + TENDON_CONTROL_PKT_NUM_CRC_BYTES + TENDON_CONTROL_PKT_NUM_ID_BYTES + TENDON_CONTROL_PKT_NUM_OPCODE_BYTES;
+  pkt_handler->tx_packet->data_packet_u.data_packet_s.motorId = id; 
+  pkt_handler->tx_packet->data_packet_u.data_packet_s.opcode = (uint8_t)opcode;
+
+  int i = 0;
+  for (; i < numParams; ++i) {
+    pkt_handler->tx_packet->data_packet_u.data_packet_s.pkt_params[i] = pkt_handler->pkt_params[i];
+  }
+
+  uint16_t rx_crc = updateCRC(0, pkt_handler->tx_packet->data_packet_u.data_packet, numParams + 5);
+  pkt_handler->tx_packet->data_packet_u.data_packet_s.pkt_params[i] = rx_crc >> 8;
+  pkt_handler->tx_packet->data_packet_u.data_packet_s.pkt_params[i + 1] = rx_crc & 0xFF;
+}
+
+void executeEcho(TendonControl_packet_handler_t* pkt_handler)
+{
+  int numParams = pkt_handler->rx_packet->data_packet_u.data_packet_s.len - 4;
+
+  for (int i = 0; i < numParams; ++i)
+  {
+    pkt_handler->pkt_params[i] = pkt_handler->rx_packet->data_packet_u.data_packet_s.pkt_params[i];
+  }
+
+  buildPacket(pkt_handler, ECHO, pkt_handler->rx_packet->data_packet_u.data_packet_s.motorId, numParams);
+}
+
+void executeReadStatus(TendonControl_packet_handler_t* pkt_handler, TendonController tendon)
+{
+  
+}
+
+void executeReadAngle(TendonControl_packet_handler_t* pkt_handler, TendonController tendon)
+{
+  int angle = (int)(tendon.Get_Angle());
+
+  uint8_t angle_upper = TENDON_CONTROL_GET_UPPER_16B(angle);
+  uint8_t angle_lower = TENDON_CONTROL_GET_LOWER_16B(angle);
+
+  pkt_handler->pkt_params[0] = COMM_SUCCESS;
+  pkt_handler->pkt_params[1] = angle_upper;
+  pkt_handler->pkt_params[2] = angle_lower;
+
+  buildPacket(pkt_handler, READ_STATUS, pkt_handler->rx_packet->data_packet_u.data_packet_s.motorId, 3);
+}
+
+void executeWriteAngle(TendonControl_packet_handler_t* pkt_handler, TendonController tendon, int16_t* target_angles)
+{
+  uint8_t len = pkt_handler->rx_packet->data_packet_u.data_packet_s.len - 4;
+
+  if (len != 2) {
+    pkt_handler->comm_result = COMM_PARAM_ERROR;
+    return;
+  }
+
+  int16_t angle = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
+    pkt_handler->rx_packet->data_packet_u.data_packet_s.pkt_params[0],
+    pkt_handler->rx_packet->data_packet_u.data_packet_s.pkt_params[1]
+  );
+
+  pkt_handler->pkt_params[0] = COMM_SUCCESS;
+  buildPacket(pkt_handler, READ_STATUS, pkt_handler->rx_packet->data_packet_u.data_packet_s.motorId, 1);
+  target_angles[pkt_handler->tx_packet->data_packet_u.data_packet_s.motorId] = angle;
+}
+
+void executeWritePID(TendonControl_packet_handler_t* pkt_handler, TendonController tendon)
+{
+  // {
+  //   uint8_t len = rx_packet->data_packet_u.data_packet_s.len - 4;
+  //   if (len != 6) {
+  //     // sprintf(outbuff, "Argument error: write pid opcode must have 6 arguments!");
+  //     pkt_handler->comm_result = COMM_PARAM_ERROR;
+  //   } else {
+  //     int16_t P = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
+  //       rx_packet->data_packet_u.data_packet_s.pkt_params[0],
+  //       rx_packet->data_packet_u.data_packet_s.pkt_params[1]
+  //     ); 
+  //     int16_t I = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
+  //       rx_packet->data_packet_u.data_packet_s.pkt_params[2],
+  //       rx_packet->data_packet_u.data_packet_s.pkt_params[3]
+  //     ); 
+  //     int16_t D = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
+  //       rx_packet->data_packet_u.data_packet_s.pkt_params[4],
+  //       rx_packet->data_packet_u.data_packet_s.pkt_params[5]
+  //     ); 
+  //     // sprintf(outbuff, "Writing motor %d pid: %d, %d, %d", rx_packet->data_packet_u.data_packet_s.motorId, P, I, D);
+  //   }
+  //   break;
+  // }
+}
+
+
+void execute(TendonControl_packet_handler_t* pkt_handler, TendonController* tendons, int16_t *target_angles,uint8_t num_tendons)
+{
+  TendonControl_data_packet_s *rx_packet = pkt_handler->rx_packet;
+   
+  switch (rx_packet->data_packet_u.data_packet_s.opcode)
+  {
+    case ECHO:
+      executeEcho(pkt_handler);
+      break;
+    case READ_STATUS:
+      break;
+    case READ_ANGLE:
+      {
+        uint8_t id = rx_packet->data_packet_u.data_packet_s.motorId;
+
+        if (id <= num_tendons)
+          executeReadAngle(pkt_handler, tendons[id]);
+        else {
+          pkt_handler->pkt_params[0] = COMM_PARAM_ERROR;
+          buildPacket(pkt_handler, READ_STATUS, pkt_handler->rx_packet->data_packet_u.data_packet_s.motorId, 1);
+        }
+      }
+      break;
+    case WRITE_ANGLE:
+      {
+      
+        uint8_t id = rx_packet->data_packet_u.data_packet_s.motorId;
+
+        executeWriteAngle(pkt_handler, tendons[id], target_angles);
+      }
+      break;
+    case WRITE_PID:
+      break;
+    default:
+      pkt_handler->comm_result = COMM_INSTRUCTION_ERROR;
+      break;
+  }
+  return;
+}

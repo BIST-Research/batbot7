@@ -1,3 +1,6 @@
+#ifndef TENDONMOTOR_H
+#define TENDONMOTOR_H
+
 #include <port/ml_port.h>
 #include <tcc/ml_tcc_common.h>
 #include <ml_pid.hpp>
@@ -38,7 +41,7 @@ public:
     float Get_Angle();
 
     // number of encoder ticks
-    float Get_Ticks();
+    int32_t Get_Ticks();
 
     // return name assigned
     String Get_Name();
@@ -135,3 +138,5 @@ private:
     // frequency of tcc channel
     uint32_t m_tcc_freq = 6000;
 };
+
+#endif

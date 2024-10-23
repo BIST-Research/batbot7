@@ -80,12 +80,15 @@ void TendonController::encoder_ISR()
 {
     static int8_t lookup_table[] = {0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0};
 
-    uint8_t a_phase = (uint8_t)(!logical_read(&m_encoder_a));
-    uint8_t b_phase = (uint8_t)(!logical_read(&m_encoder_b));
+    uint8_t a_phase = (uint8_t)(logical_read(&m_encoder_a));
+    uint8_t b_phase = (uint8_t)(logical_read(&m_encoder_b));
 
     uint16_t current_encoded = (a_phase << 1) | b_phase;
-    m_currentTicks += lookup_table[(m_lastTicks << 2) | current_encoded];
+    uint8_t idx = (m_lastTicks << 2) | current_encoded;
+    m_currentTicks += lookup_table[idx];
     m_lastTicks = current_encoded;
+
+    // Serial.println(idx, BIN);
 }
 
 void TendonController::Reset_Encoder_Zero()
@@ -261,6 +264,11 @@ void TendonController::Calibrate_Min_PWM()
 float TendonController::Get_Angle()
 {
     return ((360.0 * m_currentTicks) / (m_cycles_per_rev * m_gear_ratio));
+}
+
+int32_t TendonController::Get_Ticks()
+{
+    return m_currentTicks;
 }
 
 

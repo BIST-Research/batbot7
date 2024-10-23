@@ -143,8 +143,6 @@ void encoder_extint_init(void)
         EIC_CONFIG_SENSE7_BOTH
     );
 
-
-
     EIC->INTENSET.reg = 
     (
 

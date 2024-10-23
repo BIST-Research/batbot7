@@ -53,10 +53,10 @@ def crc16(data: bytes):
 
 
 start = time.time()
-# data = [0xFF, 0x00, 0x0A, 0x02, 0x00, 0xFF, 0xFE, 0xFF, 0xFE, 0xFF, 0xFE] # Write PID
-data = [0xFF, 0x00, 0x04, 0x00, 0x02] # Read Angle
+# data = [0xFF, 0x00, 0x0A, 0x02, 0x00, 0xFF, 0xFE, 0xFF, 0xFE, 0xFF, 0xFE]
+data = [0xFF, 0x00, 0x04, 0x00, 0x02]
 # data = [0xFF, 0x00, 0x0A, 0x02, 0x03, 0xFF, 0xFE, 0xFF, 0xFE, 0xFF, 0xFE]
-# data = [0xFF, 0x00, 0x06, 0x01, 0x03, 0x00, 0x0] # Write Angle
+# data = [0xFF, 0x00, 0x06, 0x02, 0x02, 0xFF, 0xFE]
 crc = crc16(data)
 print(hex(crc))
 data.append(crc >> 8)
@@ -69,15 +69,13 @@ ser = bb_serial.BB_Serial('/dev/ttyACM0')
 ser.set_attributes(115200, 1)
 ser.enable_blocking(True)
 
-start = time.time()
-ser.writeBytes(data, len(data))
-end = time.time()
-print(f'Packet write time: {(end - start) * 1000} ms')
 
-start = time.time()
-n, buff = ser.readBytes(100)
-end = time.time()
-print(f'Packet read time: {(end - start) * 1000} ms')
+while(True):
+    ser.writeBytes(data, len(data))
 
-print("".join('{:02x} '.format(x) for x in buff))
-# print("".join(map(chr, buff)))
+    n, buff = ser.readBytes(100)
+
+    print("".join('{:02x} '.format(x) for x in buff))
+    # print("".join(map(chr, buff)))
+
+    time.sleep(1)

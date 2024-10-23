@@ -120,7 +120,6 @@ class PinnaeController:
         self.spi = spiObj
         self.serial = serial_dev
     
-            
         if spiObj != None:
             self.com_type = COM_TYPE.SPI
             self.spi.mode = 0

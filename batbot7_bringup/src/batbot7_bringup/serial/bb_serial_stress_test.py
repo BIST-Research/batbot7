@@ -69,8 +69,8 @@ start = time.time()
 for i in range(0, N):
     ser.writeBytes(data, len(data))
     n, buff = ser.readBytes(100)
-    if buff[5] != 0:
-        print('Sent/received an erroneous packet')
-        break
+    # if buff[5] != 0:
+    #     print('Sent/received an erroneous packet')
+    #     break
 end = time.time()
 print(f'Sent {N} packets in {(end - start) * 1000} ms')

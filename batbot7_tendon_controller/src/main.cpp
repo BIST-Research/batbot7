@@ -34,8 +34,7 @@ volatile uint8_t spi_rx_buffer[SPI_RX_BUFFER_LEN] = {
     0x00,
     0x00,
     0x00,
-    0x00
-};
+    0x00};
 
 #define SPI_TX_BUFFER_LEN 17
 volatile uint8_t spi_tx_buffer[SPI_TX_BUFFER_LEN] =
@@ -56,8 +55,7 @@ volatile uint8_t spi_tx_buffer[SPI_TX_BUFFER_LEN] =
         0x00,
         0x00,
         0x00,
-        0x00
-};
+        0x00};
 
 char serial_buf[SPI_RX_BUFFER_LEN];
 
@@ -67,6 +65,8 @@ ml_spi_s spi_s = sercom1_spi_dmac_slave_prototype;
 // get DMAC channel numbers for rx and tx
 const uint8_t rx_dmac_chnum = spi_s.rx_dmac_s.ex_chnum;
 const uint8_t tx_dmac_chnum = spi_s.tx_dmac_s.ex_chnum;
+
+TendonControl_packet_handler_t pkt_handler;
 
 void dstack_a_init(void)
 {
@@ -108,7 +108,7 @@ void dstack_a_init(void)
 #define NUM_TENDONS 8
 
 int16_t target_motor_angles[NUM_TENDONS] = {
-    0, 0, 0, 0, 0, 0, 0, 0};
+    100, 100, 100, 100, 100, 100, 100, 100};
 
 TendonController tendons[NUM_TENDONS] = {
     TendonController("motor 1"),
@@ -127,15 +127,15 @@ void attach_tendons()
   // motor 1
   tendons[0].Attach_Drive_Pin(PORT_GRP_C, 20, PF_F, 4);
   tendons[0].Attach_Direction_Pin(PORT_GRP_B, 16, PF_B);
-  tendons[0].Attach_EncA_Pin(PORT_GRP_C, 13, PF_A);
-  tendons[0].Attach_EncB_Pin(PORT_GRP_C, 12, PF_A);
+  tendons[0].Attach_EncA_Pin(PORT_GRP_C, 12, PF_A);
+  tendons[0].Attach_EncB_Pin(PORT_GRP_C, 13, PF_A);
   tendons[0].m_gear_ratio = ML_HPCB_LV_100P1;
 
   // motor 2
   tendons[1].Attach_Drive_Pin(PORT_GRP_C, 21, PF_F, 5);
   tendons[1].Attach_Direction_Pin(PORT_GRP_B, 17, PF_B);
-  tendons[1].Attach_EncB_Pin(PORT_GRP_C, 15, PF_A);
-  tendons[1].Attach_EncA_Pin(PORT_GRP_C, 14, PF_A);
+  tendons[1].Attach_EncA_Pin(PORT_GRP_C, 15, PF_A);
+  tendons[1].Attach_EncB_Pin(PORT_GRP_C, 14, PF_A);
   tendons[1].m_gear_ratio = ML_HPCB_LV_100P1;
 
   // motor 3
@@ -167,16 +167,16 @@ void attach_tendons()
   // motor 7
   tendons[6].Attach_Drive_Pin(PORT_GRP_A, 12, PF_F, 6);
   tendons[6].Attach_Direction_Pin(PORT_GRP_B, 24, PF_B);
-  tendons[6].Attach_EncA_Pin(PORT_GRP_C, 0, PF_A);
-  tendons[6].Attach_EncB_Pin(PORT_GRP_C, 1, PF_A);
+  tendons[6].Attach_EncA_Pin(PORT_GRP_A, 16, PF_A);
+  tendons[6].Attach_EncB_Pin(PORT_GRP_A, 17, PF_A);
 
   // motor 8
   tendons[7].Attach_Drive_Pin(PORT_GRP_A, 13, PF_F, 7);
   tendons[7].Attach_Direction_Pin(PORT_GRP_B, 18, PF_B);
-  tendons[7].Attach_EncA_Pin(PORT_GRP_C, 2, PF_A);
+  tendons[7].Attach_EncA_Pin(PORT_GRP_A, 18, PF_A);
   tendons[7].Attach_EncB_Pin(PORT_GRP_B, 8, PF_A);
 
-// RIGHT
+  // RIGHT
   // MOTORS 9-16
   // motor 1
   // tendons[0].Attach_Drive_Pin(PORT_GRP_C, 20, PF_F, 4);
@@ -228,35 +228,9 @@ void attach_tendons()
 
 void uart_controlled()
 {
-  // if (Serial.available() >= SPI_RX_BUFFER_LEN)
-  // {
-  //   // Serial.println("Got data..");
-  //   Serial.readBytes(serial_buf, SPI_RX_BUFFER_LEN);
-
-  //   // if first byte is not a zero then we need to reset an encoders position
-  //   if (serial_buf[0] != 0)
-  //   {
-  //     tendons[uint8_t(serial_buf[0] & 0b00001111)].Reset_Encoder_Zero();
-  //   }
-
-  //   target_motor_angles[0] = int16_t(serial_buf[1] << 8 | serial_buf[2]);
-  //   target_motor_angles[1] = int16_t(serial_buf[3] << 8 | serial_buf[4]);
-  //   target_motor_angles[2] = int16_t(serial_buf[5] << 8 | serial_buf[6]);
-  //   target_motor_angles[3] = int16_t(serial_buf[7] << 8 | serial_buf[8]);
-  //   target_motor_angles[4] = int16_t(serial_buf[9] << 8 | serial_buf[10]);
-  //   target_motor_angles[5] = int16_t(serial_buf[11] << 8 | serial_buf[12]);
-  //   target_motor_angles[6] = int16_t(serial_buf[13] << 8 | serial_buf[14]);
-  //   target_motor_angles[7] = int16_t(serial_buf[15] << 8 | serial_buf[16]);
-  // }
-
-  tendon_comm_result_t comm_result = COMM_FAIL;
-
-  // tx comm failure
 
   if (Serial.available())
   {
-    char outbuff[100];
-
     char buff[TENDON_CONTROL_PKT_MAX_NUM_BYTES_IN_FRAME];
 
     size_t i = 0;
@@ -265,100 +239,18 @@ void uart_controlled()
       buff[i++] = Serial.read();
     }
 
-    if (i > 0) {
-      TendonControl_data_packet_s* rx_packet = ( TendonControl_data_packet_s *) buff;
-      uint16_t total_packet_length = TENDON_CONTROL_PKT_NUM_HEADER_BYTES + \
-                                      TENDON_CONTROL_PKT_NUM_LEN_BYTES + \
-                                      rx_packet->data_packet_u.data_packet_s.len;
+    if (i > 0)
+    {
 
-      uint16_t crc = TENDON_CONTROL_MAKE_16B_WORD(
-        rx_packet->data_packet_u.data_packet[total_packet_length - 2], 
-        rx_packet->data_packet_u.data_packet[total_packet_length - 1]
-      );
+      parsePacket(&pkt_handler, buff);
 
-      uint16_t new_crc = updateCRC(0, rx_packet->data_packet_u.data_packet, total_packet_length - TENDON_CONTROL_PKT_NUM_CRC_BYTES);
+      execute(&pkt_handler, tendons, target_motor_angles, NUM_TENDONS);
 
-      if (new_crc != crc)
-      {
-        // sprintf(outbuff, "Error: CRC mismatch %d, %x =/= %x", total_packet_length, new_crc, crc);
-        comm_result = COMM_CRC_ERROR;
-      } else {
-        comm_result = COMM_SUCCESS;
-
-        switch (rx_packet->data_packet_u.data_packet_s.opcode)
-        {
-          case READ_STATUS:
-            // sprintf(outbuff, "Reading motor %d status...", rx_packet->data_packet_u.data_packet_s.motorId);
-            break;
-          case READ_ANGLE:
-            // sprintf(outbuff, "Reading motor %d angle...", rx_packet->data_packet_u.data_packet_s.motorId);
-            break;
-          case WRITE_ANGLE:
-          {
-            uint8_t len = rx_packet->data_packet_u.data_packet_s.len - 4;
-            if (len != 2) {
-              // sprintf(outbuff, "Argument error: write angle opcode must have 2 arguments!");
-              comm_result = COMM_PARAM_ERROR;
-            } else {
-              int16_t angle = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
-                rx_packet->data_packet_u.data_packet_s.pkt_params[0],
-                rx_packet->data_packet_u.data_packet_s.pkt_params[1]
-              );
-
-              tendons[rx_packet->data_packet_u.data_packet_s.motorId].Set_Angle((float)angle);
-              
-              // sprintf(outbuff, "Writing motor %d angle to %d degrees", rx_packet->data_packet_u.data_packet_s.motorId, angle);
-            }
-            break;
-          }
-          case WRITE_PID:
-          {
-            uint8_t len = rx_packet->data_packet_u.data_packet_s.len - 4;
-            if (len != 6) {
-              // sprintf(outbuff, "Argument error: write pid opcode must have 6 arguments!");
-              comm_result = COMM_PARAM_ERROR;
-            } else {
-              int16_t P = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
-                rx_packet->data_packet_u.data_packet_s.pkt_params[0],
-                rx_packet->data_packet_u.data_packet_s.pkt_params[1]
-              ); 
-              int16_t I = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
-                rx_packet->data_packet_u.data_packet_s.pkt_params[2],
-                rx_packet->data_packet_u.data_packet_s.pkt_params[3]
-              ); 
-              int16_t D = (int16_t)TENDON_CONTROL_MAKE_16B_WORD(
-                rx_packet->data_packet_u.data_packet_s.pkt_params[4],
-                rx_packet->data_packet_u.data_packet_s.pkt_params[5]
-              ); 
-              // sprintf(outbuff, "Writing motor %d pid: %d, %d, %d", rx_packet->data_packet_u.data_packet_s.motorId, P, I, D);
-            }
-            break;
-          }
-          default:
-            comm_result = COMM_INSTRUCTION_ERROR;
-            // sprintf(outbuff, "Invalid instruction");
-            break;
-        }
-      }
-
-      TendonControl_data_packet_s tx_packet;
-      tx_packet.data_packet_u.data_packet_s.header[0] = 0xFF;
-      tx_packet.data_packet_u.data_packet_s.header[1] = 0x00;
-      tx_packet.data_packet_u.data_packet_s.len = 1 + TENDON_CONTROL_PKT_NUM_CRC_BYTES + TENDON_CONTROL_PKT_NUM_ID_BYTES + TENDON_CONTROL_PKT_NUM_OPCODE_BYTES;
-      tx_packet.data_packet_u.data_packet_s.motorId = rx_packet->data_packet_u.data_packet_s.motorId; 
-      tx_packet.data_packet_u.data_packet_s.opcode = (uint8_t)READ_STATUS;
-      tx_packet.data_packet_u.data_packet_s.pkt_params[0] = (uint8_t)comm_result;
-
-      uint16_t rx_crc = updateCRC(0, tx_packet.data_packet_u.data_packet, 6);
-      tx_packet.data_packet_u.data_packet_s.pkt_params[1] = rx_crc >> 8;
-      tx_packet.data_packet_u.data_packet_s.pkt_params[2] = rx_crc & 0xFF;
-
-      Serial.write(tx_packet.data_packet_u.data_packet, 8);
+      Serial.write(pkt_handler.tx_packet->data_packet_u.data_packet, pkt_handler.tx_packet->data_packet_u.data_packet_s.len + 3);
     }
-    // // Serial.write(outbuff);
-    // Serial.flush();
   }
 }
+
 const ml_pin_settings test_pin = {PORT_GRP_C, 6, PF_A, PP_EVEN, OUTPUT_PULL_UP, DRIVE_OFF};
 void setup()
 {
@@ -429,9 +321,9 @@ void setup()
   spi_reciever_enable(SERCOM1);
   spi_enable(SERCOM1);
 
-  peripheral_port_init(&test_pin);
-  port_pmux_disable(&test_pin);
-  logical_set(&test_pin);
+  // peripheral_port_init(&test_pin);
+  // port_pmux_disable(&test_pin);
+  // logical_set(&test_pin);
 }
 
 // when select pin has been pulled low this means the master wants to communicat
@@ -448,13 +340,12 @@ void SERCOM1_3_Handler(void)
 // when transfer is complete this is called
 _Bool dmac_rx_intflag = false;
 
-
 void DMAC_0_Handler(void)
 {
-  
+
   if (ML_DMAC_CHANNEL_TCMPL_INTFLAG(rx_dmac_chnum))
   {
-    
+
     if (spi_rx_buffer[0] & 0x80) // check if we need to reset an encoder zero
     {
 
@@ -481,7 +372,7 @@ void DMAC_0_Handler(void)
         return; // added
       }
 
-      tendons[index].Move_To_End(spi_rx_buffer[0]&0b00100000);
+      tendons[index].Move_To_End(spi_rx_buffer[0] & 0b00100000);
       target_motor_angles[index] = 0;
       // ML_DMAC_CHANNEL_CLR_TCMPL_INTFLAG(rx_dmac_chnum);
       // dmac_rx_intflag = true;
@@ -521,14 +412,14 @@ void loop()
   uart_controlled();
 
   // set the target angle
-  tendons[0].Set_Angle(target_motor_angles[0]);
-  tendons[1].Set_Angle(target_motor_angles[1]);
-  tendons[2].Set_Angle(target_motor_angles[2]);
-  tendons[3].Set_Angle(target_motor_angles[3]);
-  tendons[4].Set_Angle(target_motor_angles[4]);
-  tendons[5].Set_Angle(target_motor_angles[5]);
-  tendons[6].Set_Angle(target_motor_angles[6]);
-  tendons[7].Set_Angle(target_motor_angles[7]);
+  // tendons[0].Set_Angle(target_motor_angles[0]);
+  // tendons[1].Set_Angle(target_motor_angles[1]);
+  // tendons[2].Set_Angle(target_motor_angles[2]);
+  // tendons[3].Set_Angle(target_motor_angles[3]);
+  // tendons[4].Set_Angle(target_motor_angles[4]);
+  // tendons[5].Set_Angle(target_motor_angles[5]);
+  // tendons[6].Set_Angle(target_motor_angles[6]);
+  // tendons[7].Set_Angle(target_motor_angles[7]);
 }
 
 //-----------------------------------------------------------------
@@ -555,13 +446,13 @@ void loop()
  * M6:
  *      enca: A3 --> PC00 --> EXTINT[0]
  *      encb: A4 --> PC01 --> EXTINT[1]
- * 
+ *
  * M7:
  *      enca: A11 --> PC02 --> EXTINT[2]
  *      encb: A5 --> PC08 --> EXTINT[8]
  */
 
-//0, 1, (2), 3, 4, 5, 6, 7, (8), 9, 10, 11, 12, 13, 14, 15
+// 0, 1, (2), 3, 4, 5, 6, 7, (8), 9, 10, 11, 12, 13, 14, 15
 
 // M0
 //  *      enca: D40 --> PC13 --> EXTINT[13]
@@ -648,23 +539,23 @@ void EIC_3_Handler(void)
 }
 
 // M6
-void EIC_1_Handler(void)
-{
-  ML_EIC_CLR_INTFLAG(1);
-  tendons[6].encoder_ISR();
-}
+//  *      enca: D37 --> PA16 --> EXTINT[0]
+//  *      encb: D36 --> PA17 --> EXTINT[1]
 void EIC_0_Handler(void)
 {
   ML_EIC_CLR_INTFLAG(0);
   tendons[6].encoder_ISR();
 }
+void EIC_1_Handler(void)
+{
+  ML_EIC_CLR_INTFLAG(1);
+  tendons[6].encoder_ISR();
+}
 
-/*
- * 
- * M7:
- *      enca: A11 --> PC02 --> EXTINT[2]
- *      encb: A5 --> PC08 --> EXTINT[8]
- */
+// M7:
+//  *      encb: D35 --> PA18 --> EXTINT[2]
+//  *      enca: A11 --> PC02 --> EXTINT[8]
+
 void EIC_2_Handler(void)
 {
   ML_EIC_CLR_INTFLAG(2);
@@ -676,15 +567,3 @@ void EIC_8_Handler(void)
   ML_EIC_CLR_INTFLAG(8);
   tendons[8].encoder_ISR();
 }
-
-// // M6
-// void EIC_2_Handler(void)
-// {
-//   EIC_CLR_INTFLAG(1);
-//   tendons[6].encoder_ISR();
-// }
-// void EIC_8_Handler(void)
-// {
-//   EIC_CLR_INTFLAG(0);
-//   tendons[6].encoder_ISR();
-// }

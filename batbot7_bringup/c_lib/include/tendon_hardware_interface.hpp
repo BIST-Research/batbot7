@@ -1,13 +1,15 @@
+#ifndef TENDON_HARDWARE_INTERFACE_HPP
+#define TENDON_HARDWARE_INTERFACE_HPP
+
 /**
- * @file 
- * @brief This file definies the serial communication protocol for tendon control 
+ * @author Jayson De La Vega
+ * @date 2024-10-17
+ * @ Interface for communicating with tendon controller
  * 
  */
-#ifndef ML_TENDON_COMM_PROTOCOL
-#define ML_TENDON_COMM_PROTOCOL
 
-#include <stdint.h>
-#include <TendonMotor.h>
+#include "serial_object.hpp"
+#include "stdint.h"
 
 /**
  * @brief Maximum packet size acceptable for this application
@@ -124,84 +126,77 @@ typedef enum {
   COMM_PARAM_ERROR
 } tendon_comm_result_t;
 
-/**
- * @brief Struct to define tendon control data packet
- * 
- * This struct defines the data packets defined by the tendon control communication protocol
- * The structure of a packet is as follows:
- * 
- * [ HEADER 1 ][ HEADER 2 ][ LENGTH ][ MOTOR ID ][ OPCODE ][ PARAMS ][ CRC HIGH ][ CRC LOW ]
- * 
- * HEADER 1+2: Used as a packet delimiter to signifify the start of a new packet. Always the bytes 0xFF 0x00.
- * LENGTH: 8-bit integer used to specify the length of the packet. The header and length fields
- *          are not taken into account when calculating length, so the length is calculated as
- *          4 + number of params (4 comes from opcode, params, and both CRC fields).
- * MOTOR ID: The id of the motor to read/write. Motors are assumed to be 1 indexed, so 0x00
- *            is used to read/write all motors.
- * OPCODE: 8-bit integer used to command the tendon controller to perform a certain action
- *          (e.g. read/write angles, write PID, etc.)
- * PARAMS: An array of 8-bit integers. Used as the "arguments" for the opcode.
- * CRC HIGH+LOW: Together, form a a 16-bit CRC used for checking data corruption
- * 
- * NOTE: When modifying this struct, keep field order and byte-alignment in mind.
- * 
- * This data structure takes advantage of byte-alignment, allowing for direct
- * casting of the input buffer directly to this object. This also allows for
- * accessing fields using either array or struct accessors.
- */
-typedef struct
+
+class TendonHardwareInterface
 {
-  union
-  {
-    uint8_t data_packet[TENDON_CONTROL_PKT_MAX_NUM_BYTES_IN_FRAME];
+public:
 
-    struct {
-      uint8_t header[TENDON_CONTROL_PKT_NUM_HEADER_BYTES];
-      uint8_t len;
-      uint8_t motorId;
-      uint8_t opcode;
-      uint8_t pkt_params[TENDON_CONTROL_PKT_MAX_NUM_PARAM_BYTES];
-    } data_packet_s;
-  } data_packet_u;
-} TendonControl_data_packet_s;
+    TendonHardwareInterface(std::string portName);
+    ~TendonHardwareInterface();
 
-typedef struct
-{
-  TendonControl_data_packet_s *rx_packet;
-  TendonControl_data_packet_s *tx_packet;
 
-  uint8_t pkt_params[TENDON_CONTROL_PKT_MAX_NUM_PARAM_BYTES];
+    typedef struct {
+        uint8_t motorId;
+        uint8_t opcode;
+        uint8_t numParams;
+        uint8_t pkt_params[TENDON_CONTROL_PKT_MAX_NUM_PARAM_BYTES];
+    } TendonHardwareResponse;
 
-  tendon_comm_result_t comm_result;
+    void BuildPacket(uint8_t id, uint8_t opcode, uint8_t* params, std::size_t num_params);
 
-} TendonControl_packet_handler_t;
+    void SendTxRx();
 
-/**
- * @brief Function used to obtain 16-bit CRC
- * 
- * @param crc_accum Used to input running crc
- * @param data The data to check
- * @param data_blk_size The number of bytes in the data
- * @return The 16-bit CRC as a uint16_t 
- */
-uint16_t updateCRC(uint16_t crc_accum, uint8_t *data, uint16_t data_blk_size);
+    void SendTx();
+    
+private:
 
-/**
- * @brief This function parses an rx packet from a stream of bytes and validates CRC
- *
- * @param pkt_handler the packet handler
- * @param buff the buffer stream to process
- */
-void parsePacket(TendonControl_packet_handler_t* pkt_handler, const char* buff);
+    uint16_t CRC16(uint16_t crc_accum, uint8_t *data, uint16_t data_blk_size);
 
-/**
- * @brief This function builds a tx packet including CRC
- * 
- * @param pkt_handler the packet handler
- */
-void buildPacket(TendonControl_packet_handler_t pkt_handler, ...);
+    SerialObject* ser;
 
-// function to execute packet
-void execute(TendonControl_packet_handler_t* pkt_handler, TendonController* tendons, int16_t *target_angles, uint8_t num_tendons);
+    /**
+     * @brief Struct to define tendon control data packet
+     * 
+     * This struct defines the data packets defined by the tendon control communication protocol
+     * The structure of a packet is as follows:
+     * 
+     * [ HEADER 1 ][ HEADER 2 ][ LENGTH ][ MOTOR ID ][ OPCODE ][ PARAMS ][ CRC HIGH ][ CRC LOW ]
+     * 
+     * HEADER 1+2: Used as a packet delimiter to signifify the start of a new packet. Always the bytes 0xFF 0x00.
+     * LENGTH: 8-bit integer used to specify the length of the packet. The header and length fields
+     *          are not taken into account when calculating length, so the length is calculated as
+     *          4 + number of params (4 comes from opcode, params, and both CRC fields).
+     * MOTOR ID: The id of the motor to read/write. Motors are assumed to be 1 indexed, so 0x00
+     *            is used to read/write all motors.
+     * OPCODE: 8-bit integer used to command the tendon controller to perform a certain action
+     *          (e.g. read/write angles, write PID, etc.)
+     * PARAMS: An array of 8-bit integers. Used as the "arguments" for the opcode.
+     * CRC HIGH+LOW: Together, form a a 16-bit CRC used for checking data corruption
+     * 
+     * NOTE: When modifying this struct, keep field order and byte-alignment in mind.
+     * 
+     * This data structure takes advantage of byte-alignment, allowing for direct
+     * casting of the input buffer directly to this object. This also allows for
+     * accessing fields using either array or struct accessors.
+     */
+    typedef struct
+    {
+        union
+        {
+            uint8_t data_packet[TENDON_CONTROL_PKT_MAX_NUM_BYTES_IN_FRAME];
+
+            struct {
+                uint8_t header[TENDON_CONTROL_PKT_NUM_HEADER_BYTES];
+                uint8_t len;
+                uint8_t motorId;
+                uint8_t opcode;
+                uint8_t pkt_params[TENDON_CONTROL_PKT_MAX_NUM_PARAM_BYTES];
+            } data_packet_s;
+        } data_packet_u;
+    } TendonControl_data_packet_s;
+
+    TendonControl_data_packet_s rx;
+    TendonControl_data_packet_s tx;
+};
 
 #endif
